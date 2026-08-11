@@ -4,7 +4,7 @@ Tags: woocommerce, whatsapp, invoice, pdf, jetlinez, order status
 Requires at least: 6.2
 Requires PHP: 7.4
 WC requires at least: 7.0
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,7 +12,7 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 == Description ==
 
-این افزونه با تغییر وضعیت سفارش ووکامرس به «در حال انجام» یا «تکمیل شده»، پیام سفارش را برای شماره‌های تعیین‌شده از طریق Jetlinez ارسال می‌کند.
+این افزونه با تغییر سفارش به هرکدام از وضعیت‌های انتخاب‌شده در تنظیمات، پیام سفارش و فاکتور را برای شماره‌های تعیین‌شده از طریق Jetlinez ارسال می‌کند.
 
 در صورت فعال بودن PeproDev Ultimate Invoice، افزونه PDF فاکتور را تولید می‌کند، ابتدا آن را در endpoint مدیای Jetlinez آپلود می‌کند و سپس شناسه mediaId را برای ارسال فایل به endpoint واتساپ می‌فرستد.
 
@@ -22,7 +22,7 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 * پنل تنظیمات کامل در WooCommerce > Jetlinez WhatsApp
 * احراز هویت با هدر X-API-KEY
-* پشتیبانی از وضعیت‌های Processing و Completed
+* انتخاب چندگانه از همه وضعیت‌های اصلی و سفارشی ووکامرس برای ارسال خودکار
 * شماره‌های ثابت و شماره صورتحساب خریدار
 * نرمال‌سازی شماره‌های فارسی، عربی و بین‌المللی
 * تولید PDF با متد عمومی PeproDev Ultimate Invoice
@@ -95,6 +95,11 @@ WooCommerce > Status > Logs و سپس منبع `jetlinez-invoice` را انتخ�
 * `jlwi_http_request_args`
 
 == Changelog ==
+
+= 1.2.0 =
+
+* افزودن انتخاب چندگانه وضعیت‌های سفارش برای تعیین دقیق مرحله‌های ارسال خودکار پیام و فاکتور.
+* پشتیبانی از وضعیت‌های سفارشی ثبت‌شده در ووکامرس و حفظ تنظیمات نسخه‌های قبلی.
 
 = 1.1.0 =
 

@@ -38,6 +38,8 @@ final class JLWI_Settings {
 			'api_base_url'                     => 'https://my.jetlinez.com/api/v1',
 			'api_key'                          => '',
 			'device_id'                        => '',
+			'target_statuses'                   => array( 'processing', 'completed' ),
+			// Kept for migrating settings saved by versions earlier than 1.2.0.
 			'enable_processing'                 => 'yes',
 			'enable_completed'                  => 'yes',
 			'fixed_recipients'                  => '',
@@ -139,7 +141,9 @@ final class JLWI_Settings {
 	 */
 	public static function all() {
 		$saved    = get_option( JLWI_OPTION, array() );
-		$settings = wp_parse_args( is_array( $saved ) ? $saved : array(), self::defaults() );
+		$saved    = is_array( $saved ) ? $saved : array();
+		$settings = wp_parse_args( $saved, self::defaults() );
+		$settings['target_statuses'] = self::resolve_target_statuses( $saved, $settings );
 
 		$constant_map = array(
 			'api_base_url' => 'JLWI_API_BASE_URL',
@@ -174,8 +178,12 @@ final class JLWI_Settings {
 	 * @return array
 	 */
 	public static function raw() {
-		$saved = get_option( JLWI_OPTION, array() );
-		return wp_parse_args( is_array( $saved ) ? $saved : array(), self::defaults() );
+		$saved    = get_option( JLWI_OPTION, array() );
+		$saved    = is_array( $saved ) ? $saved : array();
+		$settings = wp_parse_args( $saved, self::defaults() );
+		$settings['target_statuses'] = self::resolve_target_statuses( $saved, $settings );
+
+		return $settings;
 	}
 
 	/**
@@ -196,16 +204,69 @@ final class JLWI_Settings {
 	 */
 	public static function is_target_status( $status ) {
 		$status = self::normalize_status( $status );
+		return '' !== $status && in_array( $status, self::target_statuses(), true );
+	}
 
-		if ( 'processing' === $status ) {
-			return self::enabled( 'enable_processing' );
+	/**
+	 * Return normalized statuses selected for automatic sending.
+	 *
+	 * @return string[]
+	 */
+	public static function target_statuses() {
+		return self::sanitize_statuses( self::get( 'target_statuses', array() ) );
+	}
+
+	/**
+	 * Sanitize a list of WooCommerce status slugs.
+	 *
+	 * @param mixed $statuses Status list.
+	 * @return string[]
+	 */
+	public static function sanitize_statuses( $statuses ) {
+		if ( is_string( $statuses ) ) {
+			$statuses = preg_split( '/[\s,]+/', $statuses );
 		}
 
-		if ( 'completed' === $status ) {
-			return self::enabled( 'enable_completed' );
+		if ( ! is_array( $statuses ) ) {
+			return array();
 		}
 
-		return false;
+		$normalized = array();
+		foreach ( $statuses as $status ) {
+			if ( ! is_scalar( $status ) ) {
+				continue;
+			}
+
+			$status = self::normalize_status( $status );
+			if ( '' !== $status ) {
+				$normalized[ $status ] = $status;
+			}
+		}
+
+		return array_values( $normalized );
+	}
+
+	/**
+	 * Resolve the new status list, including legacy processing/completed flags.
+	 *
+	 * @param array $saved    Raw saved settings.
+	 * @param array $settings Settings merged with defaults.
+	 * @return string[]
+	 */
+	private static function resolve_target_statuses( $saved, $settings ) {
+		if ( array_key_exists( 'target_statuses', $saved ) ) {
+			return self::sanitize_statuses( $saved['target_statuses'] );
+		}
+
+		$statuses = array();
+		if ( isset( $settings['enable_processing'] ) && 'yes' === $settings['enable_processing'] ) {
+			$statuses[] = 'processing';
+		}
+		if ( isset( $settings['enable_completed'] ) && 'yes' === $settings['enable_completed'] ) {
+			$statuses[] = 'completed';
+		}
+
+		return $statuses;
 	}
 
 	/**

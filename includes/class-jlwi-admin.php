@@ -79,6 +79,8 @@ final class JLWI_Admin {
 		$api_key_locked = defined( 'JLWI_API_KEY' ) && '' !== trim( (string) JLWI_API_KEY );
 		$base_locked    = defined( 'JLWI_API_BASE_URL' ) && '' !== trim( (string) JLWI_API_BASE_URL );
 		$device_locked  = defined( 'JLWI_DEVICE_ID' ) && '' !== trim( (string) JLWI_DEVICE_ID );
+		$order_statuses  = $this->order_statuses();
+		$target_statuses = JLWI_Settings::sanitize_statuses( $settings['target_statuses'] );
 		?>
 		<div class="wrap jlwi-wrap" dir="rtl">
 			<h1><?php echo esc_html__( 'Jetlinez Invoice برای WooCommerce', JLWI_TEXT_DOMAIN ); ?></h1>
@@ -144,8 +146,17 @@ final class JLWI_Admin {
 						<tr>
 							<th scope="row"><?php echo esc_html__( 'وضعیت‌های محرک', JLWI_TEXT_DOMAIN ); ?></th>
 							<td>
-								<?php $this->checkbox( 'enable_processing', $settings['enable_processing'], __( 'در حال انجام (Processing)', JLWI_TEXT_DOMAIN ) ); ?><br>
-								<?php $this->checkbox( 'enable_completed', $settings['enable_completed'], __( 'تکمیل شده (Completed)', JLWI_TEXT_DOMAIN ) ); ?>
+								<input type="hidden" name="jlwi[target_statuses][]" value="">
+								<div class="jlwi-status-options">
+									<?php foreach ( $order_statuses as $status_slug => $status_label ) : ?>
+										<label>
+											<input type="checkbox" name="jlwi[target_statuses][]" value="<?php echo esc_attr( $status_slug ); ?>" <?php checked( in_array( $status_slug, $target_statuses, true ) ); ?>>
+											<span><?php echo esc_html( $status_label ); ?></span>
+											<code><?php echo esc_html( 'wc-' . $status_slug ); ?></code>
+										</label>
+									<?php endforeach; ?>
+								</div>
+								<p class="description"><?php echo esc_html__( 'با ورود سفارش به هر وضعیت انتخاب‌شده، پیام و فاکتور به‌صورت خودکار ارسال می‌شوند. برای نمونه، با برداشتن «در حال انجام» در آن مرحله هیچ ارسالی انجام نمی‌شود.', JLWI_TEXT_DOMAIN ); ?></p>
 							</td>
 						</tr>
 						<tr>
@@ -319,8 +330,6 @@ X-API-KEY: ********
 
 		$boolean_keys = array(
 			'enabled',
-			'enable_processing',
-			'enable_completed',
 			'include_billing_phone',
 			'send_pdf',
 			'send_text_with_pdf',
@@ -336,6 +345,11 @@ X-API-KEY: ********
 		foreach ( $boolean_keys as $key ) {
 			$new[ $key ] = isset( $raw[ $key ] ) ? 'yes' : 'no';
 		}
+
+		$new['target_statuses']   = JLWI_Settings::sanitize_statuses( isset( $raw['target_statuses'] ) ? $raw['target_statuses'] : array() );
+		// Keep legacy flags in sync so downgrading does not unexpectedly enable a status.
+		$new['enable_processing'] = in_array( 'processing', $new['target_statuses'], true ) ? 'yes' : 'no';
+		$new['enable_completed']  = in_array( 'completed', $new['target_statuses'], true ) ? 'yes' : 'no';
 
 		if ( ! ( defined( 'JLWI_API_BASE_URL' ) && '' !== trim( (string) JLWI_API_BASE_URL ) ) ) {
 			$base_url = isset( $raw['api_base_url'] ) ? untrailingslashit( esc_url_raw( trim( (string) $raw['api_base_url'] ) ) ) : '';
@@ -488,6 +502,35 @@ X-API-KEY: ********
 			<td><textarea id="jlwi-<?php echo esc_attr( $key ); ?>" class="large-text code" dir="rtl" rows="8" name="jlwi[<?php echo esc_attr( $key ); ?>]"><?php echo esc_textarea( $value ); ?></textarea></td>
 		</tr>
 		<?php
+	}
+
+	/**
+	 * Return all registered WooCommerce order statuses for the selector.
+	 *
+	 * @return array<string,string> Status slug => translated label.
+	 */
+	private function order_statuses() {
+		$registered = function_exists( 'wc_get_order_statuses' )
+			? wc_get_order_statuses()
+			: array(
+				'wc-pending'    => __( 'در انتظار پرداخت', JLWI_TEXT_DOMAIN ),
+				'wc-processing' => __( 'در حال انجام', JLWI_TEXT_DOMAIN ),
+				'wc-on-hold'    => __( 'در انتظار بررسی', JLWI_TEXT_DOMAIN ),
+				'wc-completed'  => __( 'تکمیل شده', JLWI_TEXT_DOMAIN ),
+				'wc-cancelled'  => __( 'لغو شده', JLWI_TEXT_DOMAIN ),
+				'wc-refunded'   => __( 'مسترد شده', JLWI_TEXT_DOMAIN ),
+				'wc-failed'     => __( 'ناموفق', JLWI_TEXT_DOMAIN ),
+			);
+
+		$statuses = array();
+		foreach ( $registered as $status => $label ) {
+			$status = JLWI_Settings::normalize_status( $status );
+			if ( '' !== $status ) {
+				$statuses[ $status ] = (string) $label;
+			}
+		}
+
+		return $statuses;
 	}
 
 	/**

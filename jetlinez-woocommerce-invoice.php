@@ -3,7 +3,7 @@
  * Plugin Name: Jetlinez Invoice for WooCommerce
  * Plugin URI:  https://my.jetlinez.com
  * Description: ارسال خودکار وضعیت سفارش و فاکتور PDF ووکامرس از طریق واتساپ جتلاینز، با پشتیبانی از PeproDev Ultimate Invoice و حالت جایگزین متنی.
- * Version:     1.1.0
+ * Version:     1.2.0
  * Author:      Jetlinez
  * Author URI:  https://my.jetlinez.com
  * Text Domain: jetlinez-woocommerce-invoice
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'JLWI_VERSION', '1.1.0' );
+define( 'JLWI_VERSION', '1.2.0' );
 define( 'JLWI_FILE', __FILE__ );
 define( 'JLWI_DIR', plugin_dir_path( __FILE__ ) );
 define( 'JLWI_URL', plugin_dir_url( __FILE__ ) );
