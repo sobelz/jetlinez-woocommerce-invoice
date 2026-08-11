@@ -202,11 +202,11 @@ final class JLWI_Sender {
 				return;
 			}
 
-			$recipients = $this->get_recipients( $order, $status );
+			$recipients = $this->get_recipient_routes( $order, $status );
 			if ( empty( $recipients ) ) {
-				$this->log( 'warning', 'No valid Jetlinez recipients found.', array( 'order_id' => $order_id ) );
+				$this->log( 'warning', 'No active Jetlinez recipient routes found.', array( 'order_id' => $order_id, 'status' => $status ) );
 				if ( JLWI_Settings::enabled( 'add_order_notes' ) ) {
-					$order->add_order_note( __( 'Jetlinez: هیچ شماره گیرنده معتبری تنظیم نشده است.', JLWI_TEXT_DOMAIN ) );
+					$order->add_order_note( __( 'Jetlinez: برای این وضعیت هیچ مسیر ارسال فعالی با شماره معتبر وجود ندارد.', JLWI_TEXT_DOMAIN ) );
 				}
 				return;
 			}
@@ -217,15 +217,20 @@ final class JLWI_Sender {
 			$states               = array();
 			$pending              = array();
 
-			foreach ( $recipients as $phone ) {
-				$state = $this->get_state( $records, $status, $phone );
+			foreach ( $recipients as $route_id => $recipient ) {
+				$phone    = $recipient['phone'];
+				$audience = $recipient['audience'];
+				$state    = $this->get_state( $records, $status, $phone, $audience );
 				if ( $reset_current_batch ) {
-					$state = $this->blank_state( $phone, (int) $state['send_count'] + 1 );
+					$state = $this->blank_state( $phone, (int) $state['send_count'] + 1, $audience, $recipient['delivery_mode'] );
+				} elseif ( '' === (string) $state['delivery_mode'] ) {
+					$state['audience']      = $audience;
+					$state['delivery_mode'] = $recipient['delivery_mode'];
 				}
 
-				$states[ $phone ] = $state;
+				$states[ $route_id ] = $state;
 				if ( ! $prevent_duplicates || $force || ! $state['complete'] || $attempt > 0 ) {
-					$pending[] = $phone;
+					$pending[] = $route_id;
 				}
 			}
 
@@ -234,22 +239,19 @@ final class JLWI_Sender {
 				return;
 			}
 
-			$send_pdf         = JLWI_Settings::enabled( 'send_pdf' );
-			$send_text_pdf    = JLWI_Settings::enabled( 'send_text_with_pdf' );
-			$needs_media      = false;
-			$media_id         = '';
-			$upload_error     = null;
-			$fallback_note    = $send_pdf
-				? __( 'نسخه PDF فاکتور در دسترس نبود و اطلاعات سفارش به‌صورت متنی ارسال شد.', JLWI_TEXT_DOMAIN )
-				: __( 'ارسال متنی در تنظیمات افزونه انتخاب شده است.', JLWI_TEXT_DOMAIN );
+			$max_retries    = max( 0, min( 5, (int) JLWI_Settings::get( 'retry_count', 2 ) ) );
+			$needs_media    = false;
+			$media_id       = '';
+			$upload_error   = null;
+			$upload_retry   = false;
+			$retry_needed   = false;
+			$activity_count = 0;
 
-			if ( $send_pdf ) {
-				foreach ( $pending as $phone ) {
-					$state = $states[ $phone ];
-					if ( ! $state['media_sent'] && 'fallback' !== $state['mode'] ) {
-						$needs_media = true;
-						break;
-					}
+			foreach ( $pending as $route_id ) {
+				$state = $states[ $route_id ];
+				if ( in_array( $state['delivery_mode'], array( 'file', 'both' ), true ) && ! $state['media_sent'] && 'fallback' !== $state['mode'] ) {
+					$needs_media = true;
+					break;
 				}
 			}
 
@@ -257,13 +259,14 @@ final class JLWI_Sender {
 				$invoice = $this->create_invoice_file( $order );
 				if ( is_wp_error( $invoice ) ) {
 					$upload_error = $invoice;
-					$this->log_wp_error( 'warning', 'Invoice generation unavailable; using text fallback.', $invoice, $order_id );
+					$this->log_wp_error( 'warning', 'Invoice generation unavailable for configured file delivery.', $invoice, $order_id );
 					$invoice = null;
 				} else {
 					$upload = $client->upload_media( $invoice['path'] );
 					if ( is_wp_error( $upload ) ) {
 						$upload_error = $upload;
-						$this->log_wp_error( 'error', 'Jetlinez media upload failed; using text fallback.', $upload, $order_id );
+						$upload_retry = JLWI_API_Client::is_transient_error( $upload ) && $attempt < $max_retries;
+						$this->log_wp_error( 'error', 'Jetlinez media upload failed for configured file delivery.', $upload, $order_id );
 					} else {
 						$media_id = (string) $upload['id'];
 						$this->log( 'info', 'Invoice uploaded to Jetlinez media.', array( 'order_id' => $order_id, 'media_id' => $media_id ) );
@@ -271,28 +274,50 @@ final class JLWI_Sender {
 				}
 			}
 
-			// Lock each recipient into either PDF mode or fallback mode for this batch.
-			foreach ( $pending as $phone ) {
-				$state = $states[ $phone ];
+			// Lock each route into its configured mode for this delivery batch.
+			foreach ( $pending as $route_id ) {
+				$recipient    = $recipients[ $route_id ];
+				$phone        = $recipient['phone'];
+				$audience     = $recipient['audience'];
+				$state        = $states[ $route_id ];
+				$desired_mode = $state['delivery_mode'];
 
 				if ( '' === $state['mode'] ) {
-					$state['mode'] = ( $send_pdf && '' !== $media_id ) ? 'pdf' : 'fallback';
+					$state['mode'] = 'text' === $desired_mode ? 'text' : 'pdf';
+				}
+				if ( 'file_failed' === $state['mode'] && '' !== $media_id ) {
+					$state['mode'] = 'pdf';
 				}
 
-				if ( 'pdf' === $state['mode'] && ! $state['media_sent'] && '' === $media_id ) {
-					$state['mode'] = 'fallback';
+				if ( in_array( $desired_mode, array( 'file', 'both' ), true ) && ! $state['media_sent'] && '' === $media_id ) {
+					if ( $upload_retry ) {
+						$retry_needed = true;
+						$this->mark_error( $state, $upload_error, $attempt );
+					} elseif ( 'both' === $desired_mode ) {
+						$state['mode']          = 'fallback';
+						$state['fallback_note'] = __( 'نسخه PDF فاکتور در دسترس نبود و اطلاعات سفارش به‌صورت متنی ارسال شد.', JLWI_TEXT_DOMAIN );
+						if ( is_wp_error( $upload_error ) ) {
+							$this->mark_error( $state, $upload_error, $attempt );
+						}
+					} else {
+						$state['mode'] = 'file_failed';
+						$error = is_wp_error( $upload_error )
+							? $upload_error
+							: new WP_Error( 'jlwi_invoice_unavailable', __( 'فایل PDF فاکتور در دسترس نیست.', JLWI_TEXT_DOMAIN ) );
+						$this->mark_error( $state, $error, $attempt );
+					}
 				}
 
-				$states[ $phone ] = $state;
-				$this->save_state( $order, $records, $status, $phone, $state );
+				$states[ $route_id ] = $state;
+				$this->save_state( $order, $records, $status, $phone, $audience, $state );
 			}
 
-			$max_retries    = max( 0, min( 5, (int) JLWI_Settings::get( 'retry_count', 2 ) ) );
-			$retry_needed   = false;
-			$activity_count = 0;
-
-			foreach ( $pending as $phone ) {
-				$state = $states[ $phone ];
+			foreach ( $pending as $route_id ) {
+				$recipient    = $recipients[ $route_id ];
+				$phone        = $recipient['phone'];
+				$audience     = $recipient['audience'];
+				$state        = $states[ $route_id ];
+				$desired_mode = $state['delivery_mode'];
 				if ( $state['complete'] && ! $reset_current_batch ) {
 					continue;
 				}
@@ -300,10 +325,32 @@ final class JLWI_Sender {
 				$context = array(
 					'previous_status' => $previous_status,
 					'recipient'       => $phone,
+					'recipient_type'  => $audience,
 				);
 
+				if ( 'text' === $state['mode'] && ! $state['text_sent'] ) {
+					$context['invoice_note'] = __( 'در تنظیمات این گیرنده، ارسال فقط به‌صورت متن انتخاب شده است.', JLWI_TEXT_DOMAIN );
+					$text = JLWI_Template::render( JLWI_Settings::status_template( $status ), $order, $status, false, $context );
+					$res  = $client->send_message( $phone, $text );
+					++$activity_count;
+
+					if ( is_wp_error( $res ) ) {
+						$this->mark_error( $state, $res, $attempt );
+						$this->log_wp_error( 'error', 'Jetlinez text-only status message failed.', $res, $order_id, $phone );
+						if ( JLWI_API_Client::is_transient_error( $res ) && $attempt < $max_retries ) {
+							$retry_needed = true;
+						}
+					} else {
+						$state['text_sent']       = true;
+						$state['complete']        = true;
+						$state['last_error']      = '';
+						$state['last_error_code'] = '';
+						$state['last_response_id'] = $this->response_identifier( $res );
+					}
+				}
+
 				if ( 'pdf' === $state['mode'] ) {
-					if ( $send_text_pdf && ! $state['text_sent'] ) {
+					if ( 'both' === $desired_mode && ! $state['text_sent'] ) {
 						$context['invoice_note'] = $state['media_sent']
 							? __( 'فاکتور PDF قبلاً ارسال شده است.', JLWI_TEXT_DOMAIN )
 							: __( 'فاکتور PDF در پیام بعدی ارسال می‌شود.', JLWI_TEXT_DOMAIN );
@@ -323,7 +370,7 @@ final class JLWI_Sender {
 						}
 
 						$this->touch_state( $state, $attempt );
-						$this->save_state( $order, $records, $status, $phone, $state );
+						$this->save_state( $order, $records, $status, $phone, $audience, $state );
 					}
 
 					if ( ! $state['media_sent'] ) {
@@ -337,25 +384,25 @@ final class JLWI_Sender {
 
 								if ( JLWI_API_Client::is_transient_error( $res ) && $attempt < $max_retries ) {
 									$retry_needed = true;
-								} else {
+								} elseif ( 'both' === $desired_mode ) {
 									$state['mode']          = 'fallback';
 									$state['fallback_note'] = __( 'ارسال فایل PDF ناموفق بود؛ اطلاعات سفارش به‌صورت متنی ارسال شد.', JLWI_TEXT_DOMAIN );
+								} else {
+									$state['mode'] = 'file_failed';
 								}
 							} else {
 								$state['media_sent']          = true;
 								$state['last_media_id']       = $media_id;
 								$state['last_response_id']    = $this->response_identifier( $res );
 							}
-						} else {
-							$state['mode'] = 'fallback';
 						}
 
 						$this->touch_state( $state, $attempt );
-						$this->save_state( $order, $records, $status, $phone, $state );
+						$this->save_state( $order, $records, $status, $phone, $audience, $state );
 					}
 
 					if ( 'pdf' === $state['mode'] ) {
-						$state['complete'] = $state['media_sent'] && ( ! $send_text_pdf || $state['text_sent'] );
+						$state['complete'] = $state['media_sent'] && ( 'file' === $desired_mode || $state['text_sent'] );
 						if ( $state['complete'] ) {
 							$state['last_error']      = '';
 							$state['last_error_code'] = '';
@@ -363,9 +410,18 @@ final class JLWI_Sender {
 					}
 				}
 
+				if ( 'fallback' === $state['mode'] && $state['text_sent'] ) {
+					// The configured text part was already delivered before the file
+					// failed. Do not send a second text message merely as a fallback.
+					$state['fallback_sent'] = true;
+					$state['complete']      = true;
+				}
+
 				if ( 'fallback' === $state['mode'] && ! $state['fallback_sent'] ) {
 					$fallback_context                 = $context;
-					$fallback_context['invoice_note'] = '' !== (string) $state['fallback_note'] ? (string) $state['fallback_note'] : $fallback_note;
+					$fallback_context['invoice_note'] = '' !== (string) $state['fallback_note']
+						? (string) $state['fallback_note']
+						: __( 'نسخه PDF فاکتور در دسترس نبود و اطلاعات سفارش به‌صورت متنی ارسال شد.', JLWI_TEXT_DOMAIN );
 					$fallback = JLWI_Template::render(
 						(string) JLWI_Settings::get( 'template_fallback' ),
 						$order,
@@ -396,8 +452,8 @@ final class JLWI_Sender {
 				}
 
 				$this->touch_state( $state, $attempt );
-				$this->save_state( $order, $records, $status, $phone, $state );
-				$states[ $phone ] = $state;
+				$this->save_state( $order, $records, $status, $phone, $audience, $state );
+				$states[ $route_id ] = $state;
 
 			}
 
@@ -408,8 +464,10 @@ final class JLWI_Sender {
 			$completed_count = 0;
 			$fallback_count  = 0;
 			$failed_count    = 0;
-			foreach ( $recipients as $phone ) {
-				$final_state = isset( $states[ $phone ] ) ? $states[ $phone ] : $this->get_state( $records, $status, $phone );
+			foreach ( $recipients as $route_id => $recipient ) {
+				$final_state = isset( $states[ $route_id ] )
+					? $states[ $route_id ]
+					: $this->get_state( $records, $status, $recipient['phone'], $recipient['audience'] );
 				if ( ! empty( $final_state['complete'] ) ) {
 					++$completed_count;
 					if ( 'fallback' === (string) $final_state['mode'] ) {
@@ -422,8 +480,8 @@ final class JLWI_Sender {
 
 			if ( $retry_needed ) {
 				$retry_needed = false;
-				foreach ( $pending as $phone ) {
-					if ( isset( $states[ $phone ] ) && ! $states[ $phone ]['complete'] ) {
+				foreach ( $pending as $route_id ) {
+					if ( isset( $states[ $route_id ] ) && ! $states[ $route_id ]['complete'] ) {
 						$retry_needed = true;
 						break;
 					}
@@ -439,7 +497,7 @@ final class JLWI_Sender {
 					'Jetlinez retry scheduled.',
 					array( 'order_id' => $order_id, 'attempt' => $attempt + 1, 'delay' => $delay )
 				);
-			} elseif ( JLWI_Settings::enabled( 'add_order_notes' ) && $activity_count > 0 ) {
+			} elseif ( JLWI_Settings::enabled( 'add_order_notes' ) && ( $activity_count > 0 || is_wp_error( $upload_error ) ) ) {
 				$note = sprintf(
 					/* translators: 1: completed recipients, 2: fallback recipients, 3: failed recipients. */
 					__( 'Jetlinez: ارسال برای %1$d گیرنده تکمیل شد؛ %2$d مورد به‌صورت متنی و %3$d مورد ناموفق بود.', JLWI_TEXT_DOMAIN ),
@@ -636,25 +694,47 @@ final class JLWI_Sender {
 	}
 
 	/**
-	 * Build and normalize configured recipients.
+	 * Build configured recipient routes while retaining their audience and mode.
 	 *
 	 * @param WC_Order $order  Order object.
 	 * @param string   $status Status slug.
 	 * @return array
 	 */
-	private function get_recipients( $order, $status ) {
-		$raw_numbers = preg_split( '/[\r\n,;،؛]+/u', (string) JLWI_Settings::get( 'fixed_recipients', '' ) );
-		$raw_numbers = is_array( $raw_numbers ) ? $raw_numbers : array();
+	private function get_recipient_routes( $order, $status ) {
+		$admin_numbers = preg_split( '/[\r\n,;،؛]+/u', (string) JLWI_Settings::get( 'fixed_recipients', '' ) );
+		$admin_numbers = is_array( $admin_numbers ) ? $admin_numbers : array();
+		$groups        = array(
+			'admin'    => $admin_numbers,
+			'customer' => array(),
+		);
 
 		if ( JLWI_Settings::enabled( 'include_billing_phone' ) ) {
 			$billing_phone = trim( (string) $order->get_billing_phone() );
 			if ( '' !== $billing_phone ) {
-				$raw_numbers[] = $billing_phone;
+				$groups['customer'][] = $billing_phone;
 			}
 		}
 
 		/**
-		 * Filter raw recipient values before normalization.
+		 * Filter recipient groups before normalization.
+		 *
+		 * The array contains "admin" and "customer" number lists. Numbers added
+		 * through the legacy jlwi_order_recipients filter are treated as admins.
+		 *
+		 * @param array    $groups Grouped raw values.
+		 * @param WC_Order $order  Order object.
+		 * @param string   $status Status slug.
+		 */
+		$groups = apply_filters( 'jlwi_order_recipient_groups', $groups, $order, $status );
+		$groups = is_array( $groups ) ? $groups : array();
+		foreach ( array( 'admin', 'customer' ) as $audience ) {
+			$groups[ $audience ] = isset( $groups[ $audience ] ) && is_array( $groups[ $audience ] ) ? $groups[ $audience ] : array();
+		}
+
+		$raw_numbers = array_merge( $groups['admin'], $groups['customer'] );
+
+		/**
+		 * Filter all raw recipient values before normalization (legacy filter).
 		 *
 		 * @param array    $raw_numbers Raw values.
 		 * @param WC_Order $order       Order object.
@@ -663,17 +743,66 @@ final class JLWI_Sender {
 		$raw_numbers = apply_filters( 'jlwi_order_recipients', $raw_numbers, $order, $status );
 		$raw_numbers = is_array( $raw_numbers ) ? $raw_numbers : array();
 		$country_code = (string) JLWI_Settings::get( 'default_country_code', '98' );
-		$recipients   = array();
+		$allowed      = array();
 
 		foreach ( $raw_numbers as $raw_number ) {
 			$phone = self::normalize_phone( $raw_number, $country_code );
 			if ( '' !== $phone ) {
-				$recipients[ $phone ] = $phone;
+				$allowed[ $phone ] = true;
+			}
+		}
+
+		$routes       = array();
+		$group_phones = array();
+		foreach ( array_merge( $groups['admin'], $groups['customer'] ) as $raw_number ) {
+			$phone = self::normalize_phone( $raw_number, $country_code );
+			if ( '' !== $phone ) {
+				$group_phones[ $phone ] = true;
+			}
+		}
+
+		foreach ( array( 'admin', 'customer' ) as $audience ) {
+			$delivery_mode = JLWI_Settings::delivery_mode( $status, $audience );
+			if ( 'none' === $delivery_mode ) {
+				continue;
+			}
+
+			foreach ( $groups[ $audience ] as $raw_number ) {
+				$phone = self::normalize_phone( $raw_number, $country_code );
+				if ( '' === $phone || ! isset( $allowed[ $phone ] ) ) {
+					continue;
+				}
+
+				$route_id = $audience . ':' . $phone;
+				$routes[ $route_id ] = array(
+					'phone'         => $phone,
+					'audience'      => $audience,
+					'delivery_mode' => $delivery_mode,
+				);
+			}
+		}
+
+		// Preserve additions made by the legacy flat filter. Since that filter has
+		// no audience information, newly added numbers use the admin route.
+		$admin_mode = JLWI_Settings::delivery_mode( $status, 'admin' );
+		if ( 'none' !== $admin_mode ) {
+			foreach ( $raw_numbers as $raw_number ) {
+				$phone = self::normalize_phone( $raw_number, $country_code );
+				if ( '' === $phone || isset( $group_phones[ $phone ] ) ) {
+					continue;
+				}
+
+				$route_id = 'admin:' . $phone;
+				$routes[ $route_id ] = array(
+					'phone'         => $phone,
+					'audience'      => 'admin',
+					'delivery_mode' => $admin_mode,
+				);
 			}
 		}
 
 		$max = (int) apply_filters( 'jlwi_max_recipients_per_order', 100, $order, $status );
-		return array_slice( array_values( $recipients ), 0, max( 1, $max ) );
+		return array_slice( $routes, 0, max( 1, $max ), true );
 	}
 
 	/**
@@ -752,15 +881,28 @@ final class JLWI_Sender {
 	 * @param array  $records Records.
 	 * @param string $status  Status.
 	 * @param string $phone   Number.
+	 * @param string $audience Recipient audience.
 	 * @return array
 	 */
-	private function get_state( $records, $status, $phone ) {
-		$key   = hash( 'sha256', $phone );
+	private function get_state( $records, $status, $phone, $audience ) {
+		$key   = hash( 'sha256', $audience . '|' . $phone );
 		$state = isset( $records[ $status ][ $key ] ) && is_array( $records[ $status ][ $key ] )
 			? $records[ $status ][ $key ]
 			: array();
 
-		return wp_parse_args( $state, $this->blank_state( $phone, isset( $state['send_count'] ) ? (int) $state['send_count'] : 0 ) );
+		// Read records written before audiences were separated so an update does
+		// not resend already completed deliveries unexpectedly.
+		if ( empty( $state ) ) {
+			$legacy_key = hash( 'sha256', $phone );
+			$state      = isset( $records[ $status ][ $legacy_key ] ) && is_array( $records[ $status ][ $legacy_key ] )
+				? $records[ $status ][ $legacy_key ]
+				: array();
+		}
+
+		return wp_parse_args(
+			$state,
+			$this->blank_state( $phone, isset( $state['send_count'] ) ? (int) $state['send_count'] : 0, $audience )
+		);
 	}
 
 	/**
@@ -770,11 +912,12 @@ final class JLWI_Sender {
 	 * @param array    $records Records passed by reference.
 	 * @param string   $status  Status.
 	 * @param string   $phone   Number.
+	 * @param string   $audience Recipient audience.
 	 * @param array    $state   State.
 	 * @return void
 	 */
-	private function save_state( $order, &$records, $status, $phone, $state ) {
-		$key = hash( 'sha256', $phone );
+	private function save_state( $order, &$records, $status, $phone, $audience, $state ) {
+		$key = hash( 'sha256', $audience . '|' . $phone );
 		if ( ! isset( $records[ $status ] ) || ! is_array( $records[ $status ] ) ) {
 			$records[ $status ] = array();
 		}
@@ -788,11 +931,15 @@ final class JLWI_Sender {
 	 *
 	 * @param string $phone      Number.
 	 * @param int    $send_count Batch counter.
+	 * @param string $audience Recipient audience.
+	 * @param string $delivery_mode Configured delivery mode.
 	 * @return array
 	 */
-	private function blank_state( $phone, $send_count = 0 ) {
+	private function blank_state( $phone, $send_count = 0, $audience = '', $delivery_mode = '' ) {
 		return array(
 			'phone_mask'        => $this->mask_phone( $phone ),
+			'audience'          => (string) $audience,
+			'delivery_mode'     => (string) $delivery_mode,
 			'mode'              => '',
 			'text_sent'         => false,
 			'media_sent'        => false,

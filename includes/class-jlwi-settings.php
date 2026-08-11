@@ -45,6 +45,17 @@ final class JLWI_Settings {
 			'fixed_recipients'                  => '',
 			'include_billing_phone'              => 'no',
 			'default_country_code'              => '98',
+			'delivery_modes'                    => array(
+				'processing' => array(
+					'customer' => 'text',
+					'admin'    => 'file',
+				),
+				'completed'  => array(
+					'customer' => 'both',
+					'admin'    => 'text',
+				),
+			),
+			// Kept for migrating settings saved by versions earlier than 1.4.0.
 			'send_pdf'                          => 'yes',
 			'send_text_with_pdf'                => 'yes',
 			'prevent_duplicates'                => 'yes',
@@ -144,6 +155,7 @@ final class JLWI_Settings {
 		$saved    = is_array( $saved ) ? $saved : array();
 		$settings = wp_parse_args( $saved, self::defaults() );
 		$settings['target_statuses'] = self::resolve_target_statuses( $saved, $settings );
+		$settings['delivery_modes']  = self::resolve_delivery_modes( $saved, $settings );
 
 		$constant_map = array(
 			'api_base_url' => 'JLWI_API_BASE_URL',
@@ -182,6 +194,7 @@ final class JLWI_Settings {
 		$saved    = is_array( $saved ) ? $saved : array();
 		$settings = wp_parse_args( $saved, self::defaults() );
 		$settings['target_statuses'] = self::resolve_target_statuses( $saved, $settings );
+		$settings['delivery_modes']  = self::resolve_delivery_modes( $saved, $settings );
 
 		return $settings;
 	}
@@ -214,6 +227,74 @@ final class JLWI_Settings {
 	 */
 	public static function target_statuses() {
 		return self::sanitize_statuses( self::get( 'target_statuses', array() ) );
+	}
+
+	/**
+	 * Return the configured content mode for a status and recipient audience.
+	 *
+	 * Supported modes are: none, text, file and both.
+	 *
+	 * @param string $status   Status slug, with or without wc- prefix.
+	 * @param string $audience Recipient audience: customer or admin.
+	 * @return string
+	 */
+	public static function delivery_mode( $status, $audience ) {
+		$status   = self::normalize_status( $status );
+		$audience = self::sanitize_audience( $audience );
+		$modes    = self::get( 'delivery_modes', array() );
+
+		if ( '' === $status || '' === $audience ) {
+			return 'none';
+		}
+
+		if ( isset( $modes[ $status ][ $audience ] ) ) {
+			return self::sanitize_delivery_mode( $modes[ $status ][ $audience ] );
+		}
+
+		return self::legacy_delivery_mode( self::all() );
+	}
+
+	/**
+	 * Sanitize the complete status/audience delivery matrix.
+	 *
+	 * @param mixed $modes Raw matrix.
+	 * @return array
+	 */
+	public static function sanitize_delivery_modes( $modes ) {
+		if ( ! is_array( $modes ) ) {
+			return array();
+		}
+
+		$sanitized = array();
+		foreach ( $modes as $status => $audiences ) {
+			$status = self::normalize_status( $status );
+			if ( '' === $status || ! is_array( $audiences ) ) {
+				continue;
+			}
+
+			foreach ( array( 'customer', 'admin' ) as $audience ) {
+				if ( isset( $audiences[ $audience ] ) ) {
+					$sanitized[ $status ][ $audience ] = self::sanitize_delivery_mode( $audiences[ $audience ] );
+				}
+			}
+		}
+
+		return $sanitized;
+	}
+
+	/**
+	 * Sanitize one delivery mode.
+	 *
+	 * @param mixed $mode Raw mode.
+	 * @return string
+	 */
+	public static function sanitize_delivery_mode( $mode ) {
+		$mode = is_scalar( $mode ) ? sanitize_key( (string) $mode ) : '';
+		if ( 'pdf' === $mode ) {
+			$mode = 'file';
+		}
+
+		return in_array( $mode, array( 'none', 'text', 'file', 'both' ), true ) ? $mode : 'none';
 	}
 
 	/**
@@ -267,6 +348,68 @@ final class JLWI_Settings {
 		}
 
 		return $statuses;
+	}
+
+	/**
+	 * Resolve the delivery matrix, including legacy global PDF/text switches.
+	 *
+	 * @param array $saved    Raw saved settings.
+	 * @param array $settings Settings merged with defaults.
+	 * @return array
+	 */
+	private static function resolve_delivery_modes( $saved, $settings ) {
+		if ( array_key_exists( 'delivery_modes', $saved ) ) {
+			return self::sanitize_delivery_modes( $saved['delivery_modes'] );
+		}
+
+		// A fresh activation stores the new defaults. Existing installations that
+		// have not saved the matrix retain their previous global send behavior.
+		if ( empty( $saved ) ) {
+			return self::sanitize_delivery_modes( self::defaults()['delivery_modes'] );
+		}
+
+		$legacy_mode = self::legacy_delivery_mode( $settings );
+		$statuses    = self::resolve_target_statuses( $saved, $settings );
+		$modes       = array();
+		foreach ( $statuses as $status ) {
+			$modes[ $status ] = array(
+				'customer' => $legacy_mode,
+				'admin'    => $legacy_mode,
+			);
+		}
+
+		return $modes;
+	}
+
+	/**
+	 * Convert the pre-1.4.0 global switches to one delivery mode.
+	 *
+	 * @param array $settings Settings array.
+	 * @return string
+	 */
+	private static function legacy_delivery_mode( $settings ) {
+		$send_file = isset( $settings['send_pdf'] ) && 'yes' === $settings['send_pdf'];
+		$send_text = ! $send_file || ( isset( $settings['send_text_with_pdf'] ) && 'yes' === $settings['send_text_with_pdf'] );
+
+		if ( $send_file && $send_text ) {
+			return 'both';
+		}
+		if ( $send_file ) {
+			return 'file';
+		}
+
+		return 'text';
+	}
+
+	/**
+	 * Sanitize a recipient audience.
+	 *
+	 * @param mixed $audience Raw audience.
+	 * @return string
+	 */
+	private static function sanitize_audience( $audience ) {
+		$audience = is_scalar( $audience ) ? sanitize_key( (string) $audience ) : '';
+		return in_array( $audience, array( 'customer', 'admin' ), true ) ? $audience : '';
 	}
 
 	/**

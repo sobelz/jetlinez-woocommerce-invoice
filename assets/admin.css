@@ -99,6 +99,37 @@
 	font-size: 11px;
 }
 
+.jlwi-delivery-matrix-wrap {
+	overflow-x: auto;
+	max-width: 860px;
+	margin-bottom: 8px;
+}
+
+.jlwi-delivery-matrix {
+	min-width: 650px;
+}
+
+.jlwi-delivery-matrix th,
+.jlwi-delivery-matrix td {
+	vertical-align: middle;
+}
+
+.jlwi-delivery-matrix tbody th span,
+.jlwi-delivery-matrix tbody th code {
+	display: block;
+}
+
+.jlwi-delivery-matrix tbody th code {
+	direction: ltr;
+	font-size: 11px;
+	width: fit-content;
+}
+
+.jlwi-delivery-matrix select {
+	width: 100%;
+	min-width: 150px;
+}
+
 .jlwi-test-card form {
 	max-width: 760px;
 }

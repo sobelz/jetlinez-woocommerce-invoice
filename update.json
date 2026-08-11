@@ -1,7 +1,7 @@
 {
   "name": "Jetlinez Invoice for WooCommerce",
   "slug": "jetlinez-woocommerce-invoice",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "download_url": "https://plugins.sobelz.ir/jetlinez-woocommerce-invoice/jetlinez-woocommerce-invoice.zip",
   "homepage": "https://plugins.sobelz.ir/jetlinez-woocommerce-invoice",
   "author": "Jetlinez",
@@ -12,6 +12,6 @@
   "sections": {
     "description": "ارسال خودکار وضعیت سفارش و فاکتور PDF ووکامرس از طریق WhatsApp API جتلاینز.",
     "installation": "فایل ZIP را از بخش افزونه‌های وردپرس نصب کنید و تنظیمات را از منوی WooCommerce > Jetlinez WhatsApp انجام دهید.",
-    "changelog": "<h4>1.3.0</h4><ul><li>افزودن به‌روزرسان خودکار و مستقل برای دریافت نسخه‌های جدید از plugins.sobelz.ir.</li></ul>"
+    "changelog": "<h4>1.4.0</h4><ul><li>افزودن انتخاب مستقل نوع ارسال برای هر وضعیت و برای مشتری/ادمین.</li><li>پشتیبانی از عدم ارسال، فقط متن، فقط فایل و متن و فایل.</li></ul><h4>1.3.0</h4><ul><li>افزودن به‌روزرسان خودکار و مستقل برای دریافت نسخه‌های جدید از plugins.sobelz.ir.</li></ul>"
   }
 }

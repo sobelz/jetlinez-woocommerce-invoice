@@ -81,6 +81,7 @@ final class JLWI_Admin {
 		$device_locked  = defined( 'JLWI_DEVICE_ID' ) && '' !== trim( (string) JLWI_DEVICE_ID );
 		$order_statuses  = $this->order_statuses();
 		$target_statuses = JLWI_Settings::sanitize_statuses( $settings['target_statuses'] );
+		$delivery_modes  = JLWI_Settings::sanitize_delivery_modes( $settings['delivery_modes'] );
 		?>
 		<div class="wrap jlwi-wrap" dir="rtl">
 			<h1><?php echo esc_html__( 'Jetlinez Invoice برای WooCommerce', JLWI_TEXT_DOMAIN ); ?></h1>
@@ -156,21 +157,54 @@ final class JLWI_Admin {
 										</label>
 									<?php endforeach; ?>
 								</div>
-								<p class="description"><?php echo esc_html__( 'با ورود سفارش به هر وضعیت انتخاب‌شده، پیام و فاکتور به‌صورت خودکار ارسال می‌شوند. برای نمونه، با برداشتن «در حال انجام» در آن مرحله هیچ ارسالی انجام نمی‌شود.', JLWI_TEXT_DOMAIN ); ?></p>
+								<p class="description"><?php echo esc_html__( 'با ورود سفارش به هر وضعیت انتخاب‌شده، ارسال‌های فعال در جدول زیر اجرا می‌شوند. با برداشتن یک وضعیت، در آن مرحله هیچ ارسال خودکاری انجام نمی‌شود.', JLWI_TEXT_DOMAIN ); ?></p>
 							</td>
 						</tr>
 						<tr>
-							<th scope="row"><label for="jlwi-fixed-recipients"><?php echo esc_html__( 'شماره‌های ثابت گیرنده', JLWI_TEXT_DOMAIN ); ?></label></th>
+							<th scope="row"><?php echo esc_html__( 'نوع ارسال بر اساس گیرنده', JLWI_TEXT_DOMAIN ); ?></th>
+							<td>
+								<div class="jlwi-delivery-matrix-wrap">
+									<table class="widefat striped jlwi-delivery-matrix">
+										<thead>
+										<tr>
+											<th><?php echo esc_html__( 'وضعیت سفارش', JLWI_TEXT_DOMAIN ); ?></th>
+											<th><?php echo esc_html__( 'مشتری', JLWI_TEXT_DOMAIN ); ?></th>
+											<th><?php echo esc_html__( 'ادمین‌ها (شماره‌های ثابت)', JLWI_TEXT_DOMAIN ); ?></th>
+										</tr>
+										</thead>
+										<tbody>
+										<?php foreach ( $order_statuses as $status_slug => $status_label ) : ?>
+											<?php
+											$customer_mode = isset( $delivery_modes[ $status_slug ]['customer'] ) ? $delivery_modes[ $status_slug ]['customer'] : JLWI_Settings::delivery_mode( $status_slug, 'customer' );
+											$admin_mode    = isset( $delivery_modes[ $status_slug ]['admin'] ) ? $delivery_modes[ $status_slug ]['admin'] : JLWI_Settings::delivery_mode( $status_slug, 'admin' );
+											?>
+											<tr>
+												<th scope="row">
+													<span><?php echo esc_html( $status_label ); ?></span>
+													<code><?php echo esc_html( 'wc-' . $status_slug ); ?></code>
+												</th>
+												<td><?php $this->delivery_mode_select( $status_slug, 'customer', $customer_mode ); ?></td>
+												<td><?php $this->delivery_mode_select( $status_slug, 'admin', $admin_mode ); ?></td>
+											</tr>
+										<?php endforeach; ?>
+										</tbody>
+									</table>
+								</div>
+								<p class="description"><?php echo esc_html__( '«فقط فایل» هیچ پیام متنی نمی‌فرستد. «متن و فایل» به دلیل محدودیت document جتلاینز در دو پیام جدا ارسال می‌شود. «عدم ارسال» فقط همان گیرنده را در همان وضعیت غیرفعال می‌کند.', JLWI_TEXT_DOMAIN ); ?></p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="jlwi-fixed-recipients"><?php echo esc_html__( 'شماره‌های ادمین‌ها', JLWI_TEXT_DOMAIN ); ?></label></th>
 							<td>
 								<textarea id="jlwi-fixed-recipients" class="large-text code ltr" rows="6" name="jlwi[fixed_recipients]" placeholder="989121234567&#10;989351234567"><?php echo esc_textarea( $settings['fixed_recipients'] ); ?></textarea>
-								<p class="description"><?php echo esc_html__( 'هر شماره در یک خط؛ جداکننده ویرگول یا نقطه‌ویرگول نیز پذیرفته می‌شود.', JLWI_TEXT_DOMAIN ); ?></p>
+								<p class="description"><?php echo esc_html__( 'شماره‌های ثابت، گیرنده «ادمین» محسوب می‌شوند. هر شماره در یک خط؛ جداکننده ویرگول یا نقطه‌ویرگول نیز پذیرفته می‌شود.', JLWI_TEXT_DOMAIN ); ?></p>
 							</td>
 						</tr>
 						<tr>
-							<th scope="row"><?php echo esc_html__( 'ارسال فاکتور به خریدار', JLWI_TEXT_DOMAIN ); ?></th>
+							<th scope="row"><?php echo esc_html__( 'ارسال به مشتری', JLWI_TEXT_DOMAIN ); ?></th>
 							<td>
-								<?php $this->checkbox( 'include_billing_phone', $settings['include_billing_phone'], __( 'فاکتور علاوه بر گیرنده‌های ثابت، به شماره صورتحساب خریدار نیز ارسال شود.', JLWI_TEXT_DOMAIN ) ); ?>
-								<p class="description"><?php echo esc_html__( 'ارسال به خریدار فقط زمانی انجام می‌شود که سفارش شماره صورتحساب معتبر داشته باشد. با خاموش‌کردن این گزینه، ارسال به گیرنده‌های ثابت بدون تغییر ادامه پیدا می‌کند.', JLWI_TEXT_DOMAIN ); ?></p>
+								<?php $this->checkbox( 'include_billing_phone', $settings['include_billing_phone'], __( 'ارسال‌های ستون مشتری به شماره صورتحساب سفارش انجام شود.', JLWI_TEXT_DOMAIN ) ); ?>
+								<p class="description"><?php echo esc_html__( 'با خاموش‌کردن این گزینه فقط مسیر مشتری متوقف می‌شود و ارسال به شماره‌های ادمین ادامه دارد.', JLWI_TEXT_DOMAIN ); ?></p>
 							</td>
 						</tr>
 						<tr>
@@ -189,17 +223,9 @@ final class JLWI_Admin {
 				</section>
 
 				<section class="jlwi-card">
-					<h2><?php echo esc_html__( '۳. فاکتور و رفتار جایگزین', JLWI_TEXT_DOMAIN ); ?></h2>
+					<h2><?php echo esc_html__( '۳. فایل فاکتور و رفتار جایگزین', JLWI_TEXT_DOMAIN ); ?></h2>
 					<table class="form-table" role="presentation">
 						<tbody>
-						<tr>
-							<th scope="row"><?php echo esc_html__( 'فاکتور PDF', JLWI_TEXT_DOMAIN ); ?></th>
-							<td>
-								<?php $this->checkbox( 'send_pdf', $settings['send_pdf'], __( 'در صورت دسترسی به Ultimate Invoice، PDF تولید و ارسال شود.', JLWI_TEXT_DOMAIN ) ); ?><br>
-								<?php $this->checkbox( 'send_text_with_pdf', $settings['send_text_with_pdf'], __( 'همراه PDF، پیام وضعیت نیز جداگانه ارسال شود.', JLWI_TEXT_DOMAIN ) ); ?>
-								<p class="description"><?php echo esc_html__( 'API جتلاینز برای document کپشن متنی را منتقل نمی‌کند؛ بنابراین متن و PDF دو پیام جدا هستند.', JLWI_TEXT_DOMAIN ); ?></p>
-							</td>
-						</tr>
 						<tr>
 							<th scope="row"><?php echo esc_html__( 'پاک‌سازی فایل‌ها', JLWI_TEXT_DOMAIN ); ?></th>
 							<td>
@@ -225,7 +251,7 @@ final class JLWI_Admin {
 
 				<section class="jlwi-card">
 					<h2><?php echo esc_html__( '۴. متن پیام‌ها', JLWI_TEXT_DOMAIN ); ?></h2>
-					<p><?php echo esc_html__( 'پیام وضعیت پیش از PDF ارسال می‌شود. اگر افزونه فاکتور موجود نباشد، تولید/آپلود PDF شکست بخورد یا ارسال فایل نهایی ناموفق باشد، قالب جایگزین متنی استفاده می‌شود.', JLWI_TEXT_DOMAIN ); ?></p>
+					<p><?php echo esc_html__( 'قالب وضعیت برای حالت «فقط متن» و بخش متنی حالت «متن و فایل» استفاده می‌شود. اگر فایل در حالت «متن و فایل» در دسترس نباشد، قالب جایگزین متنی ارسال می‌شود؛ حالت «فقط فایل» هرگز متن جایگزین نمی‌فرستد.', JLWI_TEXT_DOMAIN ); ?></p>
 					<table class="form-table" role="presentation">
 						<tbody>
 						<?php $this->template_row( 'template_processing', __( 'قالب «در حال انجام»', JLWI_TEXT_DOMAIN ), $settings['template_processing'] ); ?>
@@ -331,8 +357,6 @@ X-API-KEY: ********
 		$boolean_keys = array(
 			'enabled',
 			'include_billing_phone',
-			'send_pdf',
-			'send_text_with_pdf',
 			'prevent_duplicates',
 			'without_delay',
 			'add_order_notes',
@@ -347,6 +371,7 @@ X-API-KEY: ********
 		}
 
 		$new['target_statuses']   = JLWI_Settings::sanitize_statuses( isset( $raw['target_statuses'] ) ? $raw['target_statuses'] : array() );
+		$new['delivery_modes']    = JLWI_Settings::sanitize_delivery_modes( isset( $raw['delivery_modes'] ) ? $raw['delivery_modes'] : array() );
 		// Keep legacy flags in sync so downgrading does not unexpectedly enable a status.
 		$new['enable_processing'] = in_array( 'processing', $new['target_statuses'], true ) ? 'yes' : 'no';
 		$new['enable_completed']  = in_array( 'completed', $new['target_statuses'], true ) ? 'yes' : 'no';
@@ -484,6 +509,31 @@ X-API-KEY: ********
 			<input type="checkbox" name="jlwi[<?php echo esc_attr( $key ); ?>]" value="yes" <?php checked( 'yes', $value ); ?>>
 			<?php echo esc_html( $label ); ?>
 		</label>
+		<?php
+	}
+
+	/**
+	 * Render one status/audience delivery-mode selector.
+	 *
+	 * @param string $status   Order status slug.
+	 * @param string $audience Recipient audience.
+	 * @param string $value    Current mode.
+	 * @return void
+	 */
+	private function delivery_mode_select( $status, $audience, $value ) {
+		$options = array(
+			'none' => __( 'عدم ارسال', JLWI_TEXT_DOMAIN ),
+			'text' => __( 'فقط متن', JLWI_TEXT_DOMAIN ),
+			'file' => __( 'فقط فایل فاکتور', JLWI_TEXT_DOMAIN ),
+			'both' => __( 'متن و فایل', JLWI_TEXT_DOMAIN ),
+		);
+		$value   = JLWI_Settings::sanitize_delivery_mode( $value );
+		?>
+		<select name="jlwi[delivery_modes][<?php echo esc_attr( $status ); ?>][<?php echo esc_attr( $audience ); ?>]">
+			<?php foreach ( $options as $mode => $label ) : ?>
+				<option value="<?php echo esc_attr( $mode ); ?>" <?php selected( $value, $mode ); ?>><?php echo esc_html( $label ); ?></option>
+			<?php endforeach; ?>
+		</select>
 		<?php
 	}
 
