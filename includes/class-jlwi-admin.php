@@ -156,8 +156,11 @@ final class JLWI_Admin {
 							</td>
 						</tr>
 						<tr>
-							<th scope="row"><?php echo esc_html__( 'شماره خریدار', JLWI_TEXT_DOMAIN ); ?></th>
-							<td><?php $this->checkbox( 'include_billing_phone', $settings['include_billing_phone'], __( 'شماره صورتحساب سفارش نیز به فهرست گیرنده‌ها اضافه شود.', JLWI_TEXT_DOMAIN ) ); ?></td>
+							<th scope="row"><?php echo esc_html__( 'ارسال فاکتور به خریدار', JLWI_TEXT_DOMAIN ); ?></th>
+							<td>
+								<?php $this->checkbox( 'include_billing_phone', $settings['include_billing_phone'], __( 'فاکتور علاوه بر گیرنده‌های ثابت، به شماره صورتحساب خریدار نیز ارسال شود.', JLWI_TEXT_DOMAIN ) ); ?>
+								<p class="description"><?php echo esc_html__( 'ارسال به خریدار فقط زمانی انجام می‌شود که سفارش شماره صورتحساب معتبر داشته باشد. با خاموش‌کردن این گزینه، ارسال به گیرنده‌های ثابت بدون تغییر ادامه پیدا می‌کند.', JLWI_TEXT_DOMAIN ); ?></p>
+							</td>
 						</tr>
 						<tr>
 							<th scope="row"><label for="jlwi-country-code"><?php echo esc_html__( 'کد کشور پیش‌فرض', JLWI_TEXT_DOMAIN ); ?></label></th>

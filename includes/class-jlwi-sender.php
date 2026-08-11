@@ -647,7 +647,10 @@ final class JLWI_Sender {
 		$raw_numbers = is_array( $raw_numbers ) ? $raw_numbers : array();
 
 		if ( JLWI_Settings::enabled( 'include_billing_phone' ) ) {
-			$raw_numbers[] = $order->get_billing_phone();
+			$billing_phone = trim( (string) $order->get_billing_phone() );
+			if ( '' !== $billing_phone ) {
+				$raw_numbers[] = $billing_phone;
+			}
 		}
 
 		/**

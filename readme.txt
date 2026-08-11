@@ -4,7 +4,7 @@ Tags: woocommerce, whatsapp, invoice, pdf, jetlinez, order status
 Requires at least: 6.2
 Requires PHP: 7.4
 WC requires at least: 7.0
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -95,6 +95,11 @@ WooCommerce > Status > Logs و سپس منبع `jetlinez-invoice` را انتخ�
 * `jlwi_http_request_args`
 
 == Changelog ==
+
+= 1.1.0 =
+
+* افزودن گزینه مستقل برای فعال یا غیرفعال‌کردن ارسال فاکتور به شماره صورتحساب خریدار.
+* ارسال به خریدار تنها در صورت وجود شماره معتبر انجام می‌شود و گیرنده‌های ثابت بدون تغییر باقی می‌مانند.
 
 = 1.0.0 =
 
