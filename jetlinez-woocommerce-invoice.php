@@ -3,9 +3,10 @@
  * Plugin Name: Jetlinez Invoice for WooCommerce
  * Plugin URI:  https://my.jetlinez.com
  * Description: ارسال خودکار وضعیت سفارش و فاکتور PDF ووکامرس از طریق واتساپ جتلاینز، با پشتیبانی از PeproDev Ultimate Invoice و حالت جایگزین متنی.
- * Version:     1.2.0
+ * Version:     1.3.0
  * Author:      Jetlinez
  * Author URI:  https://my.jetlinez.com
+ * Update URI:  https://plugins.sobelz.ir/jetlinez-woocommerce-invoice
  * Text Domain: jetlinez-woocommerce-invoice
  * Domain Path: /languages
  * Requires at least: 6.2
@@ -18,19 +19,28 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'JLWI_VERSION', '1.2.0' );
+define( 'JLWI_VERSION', '1.3.0' );
 define( 'JLWI_FILE', __FILE__ );
 define( 'JLWI_DIR', plugin_dir_path( __FILE__ ) );
 define( 'JLWI_URL', plugin_dir_url( __FILE__ ) );
 define( 'JLWI_OPTION', 'jlwi_settings' );
 define( 'JLWI_TEXT_DOMAIN', 'jetlinez-woocommerce-invoice' );
 
+require_once JLWI_DIR . 'includes/updater/class-sobelz-plugin-updater.php';
 require_once JLWI_DIR . 'includes/class-jlwi-settings.php';
 require_once JLWI_DIR . 'includes/class-jlwi-api-client.php';
 require_once JLWI_DIR . 'includes/class-jlwi-template.php';
 require_once JLWI_DIR . 'includes/class-jlwi-sender.php';
 require_once JLWI_DIR . 'includes/class-jlwi-admin.php';
 require_once JLWI_DIR . 'includes/class-jlwi-plugin.php';
+
+\Sobelz\PluginUpdater\V1\Updater::register(
+	array(
+		'plugin_file' => JLWI_FILE,
+		'slug'        => 'jetlinez-woocommerce-invoice',
+		'update_uri'  => 'https://plugins.sobelz.ir/jetlinez-woocommerce-invoice',
+	)
+);
 
 register_activation_hook( JLWI_FILE, array( 'JLWI_Plugin', 'activate' ) );
 

@@ -4,7 +4,7 @@ Tags: woocommerce, whatsapp, invoice, pdf, jetlinez, order status
 Requires at least: 6.2
 Requires PHP: 7.4
 WC requires at least: 7.0
-Stable tag: 1.2.0
+Stable tag: 1.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -95,6 +95,11 @@ WooCommerce > Status > Logs و سپس منبع `jetlinez-invoice` را انتخ�
 * `jlwi_http_request_args`
 
 == Changelog ==
+
+= 1.3.0 =
+
+* افزودن به‌روزرسان خودکار و مستقل برای دریافت نسخه‌های جدید از plugins.sobelz.ir.
+* افزودن اطلاعات کامل نسخه در پنجره جزئیات افزونه و کش امن اطلاعات نسخه.
 
 = 1.2.0 =
 

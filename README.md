@@ -36,6 +36,52 @@
 - WooCommerce 7.0 یا جدیدتر
 - PeproDev Ultimate Invoice فقط برای PDF؛ بدون آن حالت متنی فعال می‌ماند
 
+## انتشار و به‌روزرسان خودکار
+
+این افزونه نسخه جدید را از آدرس زیر بررسی می‌کند:
+
+```text
+https://plugins.sobelz.ir/jetlinez-woocommerce-invoice/update.json
+```
+
+بعد از هر انتشار، سرور باید این دو فایل عمومی را ارائه کند:
+
+```text
+jetlinez-woocommerce-invoice/update.json
+jetlinez-woocommerce-invoice/jetlinez-woocommerce-invoice.zip
+```
+
+پس از `git pull --ff-only` روی سرور، بسته استاندارد وردپرس را بسازید:
+
+```bash
+./tools/build-release.sh
+```
+
+اسکریپت یکسان بودن نسخه در هدر افزونه، ثابت `JLWI_VERSION` و `update.json` و تمیز بودن checkout را کنترل می‌کند. فایل ZIP نیز با پوشه ریشه `jetlinez-woocommerce-invoice/` ساخته می‌شود تا وردپرس افزونه را در مسیر اشتباه نصب نکند. فایل‌های خام Git به‌تنهایی قابل نصب توسط updater نیستند و وجود ZIP ضروری است.
+
+برای انتشار نسخه بعدی، نسخه را در این چهار محل تغییر دهید، تغییرات را commit/push کنید و سپس اسکریپت بالا را روی checkout همان commit اجرا کنید:
+
+- هدر `Version` در `jetlinez-woocommerce-invoice.php`
+- ثابت `JLWI_VERSION`
+- مقدار `Stable tag` در `readme.txt`
+- مقدار `version` و متن `sections.changelog` در `update.json`
+
+کلاس عمومی updater در `includes/updater/class-sobelz-plugin-updater.php` مستقل از این افزونه است. برای استفاده در افزونه دیگر، فایل را کپی و بعد از تعریف ثابت فایل اصلی ثبت کنید:
+
+```php
+require_once plugin_dir_path( __FILE__ ) . 'includes/updater/class-sobelz-plugin-updater.php';
+
+\Sobelz\PluginUpdater\V1\Updater::register(
+    array(
+        'plugin_file' => __FILE__,
+        'slug'        => 'my-plugin',
+        'update_uri'  => 'https://plugins.sobelz.ir/my-plugin',
+    )
+);
+```
+
+در افزونه مقصد همین URL را با هدر `Update URI` نیز اضافه کنید. updater به‌طور پیش‌فرض فایل `update.json` را کنار URL بالا می‌خواند؛ `manifest_url`، `cache_ttl` و `headers` نیز قابل تنظیم‌اند. دو فیلتر `sobelz_plugin_updater_request_args` و `sobelz_plugin_updater_manifest` برای سفارشی‌سازی عمومی وجود دارند.
+
 ## نگهداری امن کلیدها
 
 مقادیر حساس را می‌توان در `wp-config.php` تعریف کرد:
@@ -134,4 +180,4 @@ add_filter( 'jlwi_custom_invoice_is_temporary', '__return_true' );
 
 ## نسخه
 
-`1.2.0`
+`1.3.0`
