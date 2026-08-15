@@ -18,6 +18,9 @@ final class JLWI_Plugin {
 	/** @var JLWI_Admin|null */
 	private $admin = null;
 
+	/** @var JLWI_Daily_Report|null */
+	private $daily_report = null;
+
 	/**
 	 * Singleton accessor.
 	 *
@@ -40,6 +43,17 @@ final class JLWI_Plugin {
 		if ( false === get_option( JLWI_OPTION, false ) ) {
 			add_option( JLWI_OPTION, JLWI_Settings::defaults(), '', 'no' );
 		}
+
+		JLWI_Daily_Report::reschedule();
+	}
+
+	/**
+	 * Remove report scheduling when the plugin is deactivated.
+	 *
+	 * @return void
+	 */
+	public static function deactivate() {
+		JLWI_Daily_Report::clear_schedule();
 	}
 
 	/**
@@ -64,6 +78,9 @@ final class JLWI_Plugin {
 
 		$this->sender = new JLWI_Sender();
 		$this->sender->register_hooks();
+
+		$this->daily_report = new JLWI_Daily_Report();
+		$this->daily_report->register_hooks();
 	}
 
 	/**

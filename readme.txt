@@ -4,11 +4,11 @@ Tags: woocommerce, whatsapp, invoice, pdf, jetlinez, order status
 Requires at least: 6.2
 Requires PHP: 7.4
 WC requires at least: 7.0
-Stable tag: 1.4.0
+Stable tag: 1.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-ارسال خودکار پیام وضعیت و فاکتور PDF سفارش‌های ووکامرس از طریق WhatsApp API جتلاینز، با پشتیبانی از PeproDev Ultimate Invoice و جایگزین متنی.
+ارسال خودکار پیام وضعیت، فاکتور PDF و گزارش روزانه سفارش‌های ووکامرس از طریق WhatsApp API جتلاینز.
 
 == Description ==
 
@@ -32,6 +32,7 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 * قالب‌های قابل ویرایش با متغیرهای سفارش
 * جلوگیری از ارسال تکراری برای هر وضعیت و گیرنده
 * صف Action Scheduler، با جایگزین WP-Cron
+* گزارش روزانه واتساپ با ساعت و اجزای قابل تنظیم و ارسال فوری گزارش ۲۴ ساعت گذشته
 * Retry نمایی برای خطاهای موقت API
 * ثبت نتیجه در Order Notes و WooCommerce Logs
 * اکشن ارسال/ارسال مجدد دستی در صفحه سفارش
@@ -49,6 +50,7 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 7. گیرنده‌ها، کد کشور و وضعیت‌های محرک را تنظیم کنید.
 8. ابتدا با بخش «ارسال پیام آزمایشی» اتصال را بررسی کنید.
 9. گزینه «فعال‌سازی ارسال خودکار» را روشن و تنظیمات را ذخیره کنید.
+10. در صورت نیاز، ساعت و اجزای «گزارش روزانه واتساپ» را انتخاب و دکمه ارسال فوری گزارش ۲۴ ساعت گذشته را اجرا کنید.
 
 == Frequently Asked Questions ==
 
@@ -67,6 +69,12 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 = لاگ‌ها کجا هستند؟ =
 
 WooCommerce > Status > Logs و سپس منبع `jetlinez-invoice` را انتخاب کنید. API Key در لاگ ثبت نمی‌شود.
+
+= گزارش روزانه چه داده‌هایی را می‌فرستد؟ =
+
+فروش خالص امروز و تغییر نسبت به بازه مشابه دیروز، تعداد سفارش‌ها، میانگین سفارش‌های پرداخت‌شده، حساب‌های مشتری جدید، سفارش‌های لغو/بازپرداخت/رهاشده و موجودی‌های نیازمند توجه. هر بخش از پنل قابل غیرفعال‌کردن است و گزارش از همان دستگاه واتساپ و شماره‌های ثابت ادمین استفاده می‌کند. دکمه ارسال فوری همین شاخص‌ها را برای ۲۴ ساعت گذشته محاسبه و با ۲۴ ساعت قبل از آن مقایسه می‌کند.
+
+سفارش رهاشده یعنی سفارش ناموفق یا سفارش در انتظار پرداختی که از مهلت نگهداری موجودی ووکامرس قدیمی‌تر است؛ در صورت غیرفعال‌بودن آن مهلت، ۶۰ دقیقه استفاده می‌شود. WP-Cron در اولین بازدید بعد از ساعت تعیین‌شده اجرا می‌شود.
 
 = چگونه اطلاعات API را خارج از دیتابیس نگه دارم؟ =
 
@@ -94,8 +102,24 @@ WooCommerce > Status > Logs و سپس منبع `jetlinez-invoice` را انتخ�
 * `jlwi_template_tokens`
 * `jlwi_rendered_message`
 * `jlwi_http_request_args`
+* `jlwi_daily_report_recipients`
+* `jlwi_daily_report_data`
+* `jlwi_daily_report_message`
+* `jlwi_daily_report_order_query_args`
+* `jlwi_daily_report_inventory_attention`
+* `jlwi_daily_report_abandoned_after_minutes`
+* `jlwi_daily_report_customer_roles`
+* `jlwi_daily_report_inventory_limit`
+* `jlwi_max_daily_report_recipients`
 
 == Changelog ==
+
+= 1.5.0 =
+
+* افزودن گزارش روزانه فروش ووکامرس از طریق همان دستگاه واتساپ جتلاینز.
+* افزودن ساعت ارسال محلی، زمان‌بندی WP-Cron و تنظیم مستقل اجزای گزارش.
+* افزودن فروش و تغییر روزانه، سفارش‌ها، میانگین سفارش، مشتری جدید، سفارش‌های مسئله‌دار و هشدار موجودی.
+* افزودن ارسال فوری گزارش ۲۴ ساعت گذشته، نمایش اجرای بعدی و ثبت نتیجه آخرین ارسال.
 
 = 1.4.0 =
 

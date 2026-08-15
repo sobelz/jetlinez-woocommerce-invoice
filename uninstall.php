@@ -7,12 +7,16 @@
 
 defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 
+wp_clear_scheduled_hook( 'jlwi_send_daily_report' );
+
 $settings = get_option( 'jlwi_settings', array() );
 if ( ! is_array( $settings ) || 'yes' !== ( isset( $settings['delete_data_on_uninstall'] ) ? $settings['delete_data_on_uninstall'] : 'no' ) ) {
 	return;
 }
 
 delete_option( 'jlwi_settings' );
+delete_option( 'jlwi_daily_report_state' );
+delete_transient( 'jlwi_daily_report_lock' );
 
 global $wpdb;
 $like = $wpdb->esc_like( 'jlwi_lock_' ) . '%';

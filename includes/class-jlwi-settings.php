@@ -65,6 +65,16 @@ final class JLWI_Settings {
 			'delete_local_pdf'                  => 'yes',
 			'delete_remote_media'               => 'no',
 			'delete_data_on_uninstall'          => 'no',
+			'daily_report_enabled'              => 'no',
+			'daily_report_time'                 => '20:00',
+			'daily_report_sections'             => array(
+				'sales',
+				'orders',
+				'average_order',
+				'new_customers',
+				'problem_orders',
+				'inventory_attention',
+			),
 			'timeout'                           => 45,
 			'max_redirects'                     => 3,
 			'max_file_mb'                       => 20,
@@ -156,6 +166,8 @@ final class JLWI_Settings {
 		$settings = wp_parse_args( $saved, self::defaults() );
 		$settings['target_statuses'] = self::resolve_target_statuses( $saved, $settings );
 		$settings['delivery_modes']  = self::resolve_delivery_modes( $saved, $settings );
+		$settings['daily_report_time'] = self::sanitize_report_time( $settings['daily_report_time'] );
+		$settings['daily_report_sections'] = self::sanitize_report_sections( $settings['daily_report_sections'] );
 
 		$constant_map = array(
 			'api_base_url' => 'JLWI_API_BASE_URL',
@@ -195,6 +207,8 @@ final class JLWI_Settings {
 		$settings = wp_parse_args( $saved, self::defaults() );
 		$settings['target_statuses'] = self::resolve_target_statuses( $saved, $settings );
 		$settings['delivery_modes']  = self::resolve_delivery_modes( $saved, $settings );
+		$settings['daily_report_time'] = self::sanitize_report_time( $settings['daily_report_time'] );
+		$settings['daily_report_sections'] = self::sanitize_report_sections( $settings['daily_report_sections'] );
 
 		return $settings;
 	}
@@ -325,6 +339,62 @@ final class JLWI_Settings {
 		}
 
 		return array_values( $normalized );
+	}
+
+	/**
+	 * Sanitize the local time used for the daily report.
+	 *
+	 * @param mixed $time Time in HH:MM format.
+	 * @return string
+	 */
+	public static function sanitize_report_time( $time ) {
+		$time = self::ascii_digits( is_scalar( $time ) ? $time : '' );
+		$time = trim( $time );
+
+		if ( ! preg_match( '/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/', $time ) ) {
+			return self::defaults()['daily_report_time'];
+		}
+
+		return $time;
+	}
+
+	/**
+	 * Return the supported daily-report section keys and their labels.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function report_section_labels() {
+		return array(
+			'sales'               => __( 'فروش امروز و تغییر نسبت به دیروز', JLWI_TEXT_DOMAIN ),
+			'orders'              => __( 'تعداد سفارش‌ها', JLWI_TEXT_DOMAIN ),
+			'average_order'       => __( 'میانگین مبلغ سفارش', JLWI_TEXT_DOMAIN ),
+			'new_customers'       => __( 'تعداد مشتری جدید', JLWI_TEXT_DOMAIN ),
+			'problem_orders'      => __( 'سفارش‌های لغو، مرجوع و رهاشده', JLWI_TEXT_DOMAIN ),
+			'inventory_attention' => __( 'محصولات و موجودی‌های نیازمند توجه', JLWI_TEXT_DOMAIN ),
+		);
+	}
+
+	/**
+	 * Sanitize enabled daily-report sections.
+	 *
+	 * @param mixed $sections Raw section list.
+	 * @return string[]
+	 */
+	public static function sanitize_report_sections( $sections ) {
+		if ( ! is_array( $sections ) ) {
+			return array();
+		}
+
+		$allowed   = self::report_section_labels();
+		$sanitized = array();
+		foreach ( $sections as $section ) {
+			$section = is_scalar( $section ) ? sanitize_key( (string) $section ) : '';
+			if ( isset( $allowed[ $section ] ) ) {
+				$sanitized[ $section ] = $section;
+			}
+		}
+
+		return array_values( $sanitized );
 	}
 
 	/**

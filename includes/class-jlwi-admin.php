@@ -19,6 +19,7 @@ final class JLWI_Admin {
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_action( 'admin_post_jlwi_save_settings', array( $this, 'save_settings' ) );
 		add_action( 'admin_post_jlwi_send_test', array( $this, 'send_test' ) );
+		add_action( 'admin_post_jlwi_send_daily_report_now', array( $this, 'send_daily_report_now' ) );
 		add_action( 'admin_notices', array( $this, 'admin_notice' ) );
 	}
 
@@ -82,6 +83,9 @@ final class JLWI_Admin {
 		$order_statuses  = $this->order_statuses();
 		$target_statuses = JLWI_Settings::sanitize_statuses( $settings['target_statuses'] );
 		$delivery_modes  = JLWI_Settings::sanitize_delivery_modes( $settings['delivery_modes'] );
+		$report_sections = JLWI_Settings::sanitize_report_sections( $settings['daily_report_sections'] );
+		$next_report     = JLWI_Daily_Report::next_scheduled();
+		$report_enabled  = 'yes' === $settings['daily_report_enabled'];
 		?>
 		<div class="wrap jlwi-wrap" dir="rtl">
 			<h1><?php echo esc_html__( 'Jetlinez Invoice برای WooCommerce', JLWI_TEXT_DOMAIN ); ?></h1>
@@ -94,6 +98,7 @@ final class JLWI_Admin {
 				<?php $this->status_card( __( 'WooCommerce', JLWI_TEXT_DOMAIN ), class_exists( 'WooCommerce' ), class_exists( 'WooCommerce' ) ? __( 'فعال', JLWI_TEXT_DOMAIN ) : __( 'غیرفعال', JLWI_TEXT_DOMAIN ) ); ?>
 				<?php $this->status_card( __( 'Ultimate Invoice', JLWI_TEXT_DOMAIN ), $this->invoice_available(), $this->invoice_available() ? __( 'تولید PDF آماده است', JLWI_TEXT_DOMAIN ) : __( 'حالت متنی استفاده می‌شود', JLWI_TEXT_DOMAIN ) ); ?>
 				<?php $this->status_card( __( 'صف ارسال', JLWI_TEXT_DOMAIN ), function_exists( 'as_enqueue_async_action' ), function_exists( 'as_enqueue_async_action' ) ? __( 'Action Scheduler فعال است', JLWI_TEXT_DOMAIN ) : __( 'از WP-Cron/ارسال مستقیم استفاده می‌شود', JLWI_TEXT_DOMAIN ) ); ?>
+				<?php $this->status_card( __( 'گزارش روزانه', JLWI_TEXT_DOMAIN ), $report_enabled && false !== $next_report, $this->report_schedule_text( $report_enabled, $next_report ) ); ?>
 			</div>
 
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -269,8 +274,46 @@ final class JLWI_Admin {
 					</div>
 				</section>
 
+				<section id="jlwi-daily-report" class="jlwi-card">
+					<h2><?php echo esc_html__( '۵. گزارش روزانه واتساپ', JLWI_TEXT_DOMAIN ); ?></h2>
+					<p><?php echo esc_html__( 'گزارش از همان API Key و Device ID واتساپ استفاده می‌کند و برای همه شماره‌های ادمینِ بخش «وضعیت‌ها و گیرنده‌ها» فرستاده می‌شود.', JLWI_TEXT_DOMAIN ); ?></p>
+					<table class="form-table" role="presentation">
+						<tbody>
+						<tr>
+							<th scope="row"><?php echo esc_html__( 'فعال‌سازی گزارش', JLWI_TEXT_DOMAIN ); ?></th>
+							<td>
+								<?php $this->checkbox( 'daily_report_enabled', $settings['daily_report_enabled'], __( 'هر روز گزارش فروش از طریق واتساپ برای ادمین‌ها ارسال شود.', JLWI_TEXT_DOMAIN ) ); ?>
+								<p class="description"><?php echo esc_html( $this->report_schedule_text( $report_enabled, $next_report ) ); ?></p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="jlwi-daily-report-time"><?php echo esc_html__( 'ساعت ارسال', JLWI_TEXT_DOMAIN ); ?></label></th>
+							<td>
+								<input id="jlwi-daily-report-time" type="time" step="60" name="jlwi[daily_report_time]" value="<?php echo esc_attr( $settings['daily_report_time'] ); ?>">
+								<p class="description"><?php echo esc_html( sprintf( __( 'بر اساس منطقه زمانی وردپرس: %s. WP-Cron در اولین بازدید سایت پس از ساعت انتخاب‌شده اجرا می‌شود.', JLWI_TEXT_DOMAIN ), wp_timezone_string() ) ); ?></p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row"><?php echo esc_html__( 'بخش‌های گزارش', JLWI_TEXT_DOMAIN ); ?></th>
+							<td>
+								<input type="hidden" name="jlwi[daily_report_sections][]" value="">
+								<div class="jlwi-report-options">
+									<?php foreach ( JLWI_Settings::report_section_labels() as $section_key => $section_label ) : ?>
+										<label>
+											<input type="checkbox" name="jlwi[daily_report_sections][]" value="<?php echo esc_attr( $section_key ); ?>" <?php checked( in_array( $section_key, $report_sections, true ) ); ?>>
+											<span><?php echo esc_html( $section_label ); ?></span>
+										</label>
+									<?php endforeach; ?>
+								</div>
+								<p class="description"><?php echo esc_html__( '«مشتری جدید» حساب‌های مشتری ساخته‌شده امروز را می‌شمارد. «رهاشده» شامل سفارش‌های ناموفق و سفارش‌های در انتظار پرداختِ قدیمی‌تر از مهلت نگهداری موجودی ووکامرس است (در صورت غیرفعال‌بودن آن مهلت، ۶۰ دقیقه). بخش موجودی فقط زمانی به پیام اضافه می‌شود که موردی وجود داشته باشد.', JLWI_TEXT_DOMAIN ); ?></p>
+							</td>
+						</tr>
+						</tbody>
+					</table>
+				</section>
+
 				<section class="jlwi-card">
-					<h2><?php echo esc_html__( '۵. شبکه، تلاش مجدد و لاگ', JLWI_TEXT_DOMAIN ); ?></h2>
+					<h2><?php echo esc_html__( '۶. شبکه، تلاش مجدد و لاگ', JLWI_TEXT_DOMAIN ); ?></h2>
 					<table class="form-table" role="presentation">
 						<tbody>
 						<tr>
@@ -306,6 +349,17 @@ final class JLWI_Admin {
 
 				<?php submit_button( __( 'ذخیره تنظیمات', JLWI_TEXT_DOMAIN ) ); ?>
 			</form>
+
+			<section class="jlwi-card jlwi-test-card">
+				<h2><?php echo esc_html__( 'ارسال فوری گزارش ۲۴ ساعت گذشته', JLWI_TEXT_DOMAIN ); ?></h2>
+				<p><?php echo esc_html__( 'این دکمه یک گزارش واقعی از ۲۴ ساعت گذشته می‌سازد، فروش را با ۲۴ ساعت قبل از آن مقایسه می‌کند و همان لحظه برای شماره‌های ادمین می‌فرستد. برای تست اتصال و استفاده عملی قابل استفاده است و ممکن است اعتبار حساب جتلاینز را مصرف کند.', JLWI_TEXT_DOMAIN ); ?></p>
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<input type="hidden" name="action" value="jlwi_send_daily_report_now">
+					<?php wp_nonce_field( 'jlwi_send_daily_report_now' ); ?>
+					<?php submit_button( __( 'ارسال گزارش ۲۴ ساعت گذشته همین حالا', JLWI_TEXT_DOMAIN ), 'secondary', 'submit', false ); ?>
+				</form>
+				<?php $this->render_last_report_result(); ?>
+			</section>
 
 			<section class="jlwi-card jlwi-test-card">
 				<h2><?php echo esc_html__( 'ارسال پیام آزمایشی', JLWI_TEXT_DOMAIN ); ?></h2>
@@ -364,6 +418,7 @@ X-API-KEY: ********
 			'delete_local_pdf',
 			'delete_remote_media',
 			'delete_data_on_uninstall',
+			'daily_report_enabled',
 		);
 
 		foreach ( $boolean_keys as $key ) {
@@ -372,6 +427,8 @@ X-API-KEY: ********
 
 		$new['target_statuses']   = JLWI_Settings::sanitize_statuses( isset( $raw['target_statuses'] ) ? $raw['target_statuses'] : array() );
 		$new['delivery_modes']    = JLWI_Settings::sanitize_delivery_modes( isset( $raw['delivery_modes'] ) ? $raw['delivery_modes'] : array() );
+		$new['daily_report_time'] = JLWI_Settings::sanitize_report_time( isset( $raw['daily_report_time'] ) ? $raw['daily_report_time'] : $existing['daily_report_time'] );
+		$new['daily_report_sections'] = JLWI_Settings::sanitize_report_sections( isset( $raw['daily_report_sections'] ) ? $raw['daily_report_sections'] : array() );
 		// Keep legacy flags in sync so downgrading does not unexpectedly enable a status.
 		$new['enable_processing'] = in_array( 'processing', $new['target_statuses'], true ) ? 'yes' : 'no';
 		$new['enable_completed']  = in_array( 'completed', $new['target_statuses'], true ) ? 'yes' : 'no';
@@ -424,6 +481,7 @@ X-API-KEY: ********
 		}
 
 		update_option( JLWI_OPTION, $new, false );
+		JLWI_Daily_Report::reschedule();
 		$this->set_notice( 'success', __( 'تنظیمات Jetlinez ذخیره شد.', JLWI_TEXT_DOMAIN ) );
 		wp_safe_redirect( $this->settings_url() );
 		exit;
@@ -463,6 +521,38 @@ X-API-KEY: ********
 	}
 
 	/**
+	 * Build and immediately send a rolling 24-hour report to admin recipients.
+	 *
+	 * @return void
+	 */
+	public function send_daily_report_now() {
+		$this->authorize( 'jlwi_send_daily_report_now' );
+
+		$report = new JLWI_Daily_Report();
+		$result = $report->send_now( 'last_24_hours' );
+
+		if ( is_wp_error( $result ) ) {
+			$this->set_notice( 'error', sprintf( __( 'ارسال فوری گزارش ناموفق بود: %s', JLWI_TEXT_DOMAIN ), $result->get_error_message() ) );
+		} elseif ( ! empty( $result['failed'] ) ) {
+			$this->set_notice(
+				'warning',
+				sprintf(
+					__( 'گزارش برای %1$d گیرنده ارسال شد و ارسال به %2$d گیرنده ناموفق بود.', JLWI_TEXT_DOMAIN ),
+					(int) $result['sent'],
+					(int) $result['failed']
+				)
+			);
+		} else {
+			$this->set_notice(
+				'success',
+				sprintf( __( 'گزارش ۲۴ ساعت گذشته با موفقیت برای %d گیرنده ارسال شد.', JLWI_TEXT_DOMAIN ), (int) $result['sent'] )
+			);
+		}
+
+		$this->redirect_settings();
+	}
+
+	/**
 	 * Print a one-time admin notice.
 	 *
 	 * @return void
@@ -476,6 +566,76 @@ X-API-KEY: ********
 		delete_transient( 'jlwi_admin_notice_' . get_current_user_id() );
 		$type = isset( $notice['type'] ) && in_array( $notice['type'], array( 'success', 'error', 'warning', 'info' ), true ) ? $notice['type'] : 'info';
 		echo '<div class="notice notice-' . esc_attr( $type ) . ' is-dismissible"><p>' . esc_html( $notice['message'] ) . '</p></div>';
+	}
+
+	/**
+	 * Describe the current daily-report schedule.
+	 *
+	 * @param bool      $enabled   Whether reporting is enabled.
+	 * @param int|false $timestamp Next event timestamp.
+	 * @return string
+	 */
+	private function report_schedule_text( $enabled, $timestamp ) {
+		if ( ! $enabled ) {
+			return __( 'غیرفعال', JLWI_TEXT_DOMAIN );
+		}
+
+		$sections = JLWI_Settings::sanitize_report_sections( JLWI_Settings::get( 'daily_report_sections', array() ) );
+		if ( empty( $sections ) ) {
+			return __( 'فعال است، اما برای زمان‌بندی باید حداقل یک بخش گزارش انتخاب شود.', JLWI_TEXT_DOMAIN );
+		}
+
+		if ( false === $timestamp ) {
+			return __( 'فعال است؛ رویداد WP-Cron پس از ذخیره تنظیمات ایجاد می‌شود.', JLWI_TEXT_DOMAIN );
+		}
+
+		return sprintf(
+			__( 'اجرای بعدی: %s', JLWI_TEXT_DOMAIN ),
+			wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $timestamp, wp_timezone() )
+		);
+	}
+
+	/**
+	 * Render the most recent report-delivery result, when available.
+	 *
+	 * @return void
+	 */
+	private function render_last_report_result() {
+		$state = get_option( JLWI_REPORT_STATE_OPTION, array() );
+		if ( ! is_array( $state ) || empty( $state['timestamp'] ) ) {
+			return;
+		}
+
+		$status_labels = array(
+			'success' => __( 'موفق', JLWI_TEXT_DOMAIN ),
+			'partial' => __( 'نیمه‌موفق', JLWI_TEXT_DOMAIN ),
+			'failed'  => __( 'ناموفق', JLWI_TEXT_DOMAIN ),
+		);
+		$status = isset( $state['status'], $status_labels[ $state['status'] ] ) ? $status_labels[ $state['status'] ] : __( 'نامشخص', JLWI_TEXT_DOMAIN );
+		$sent   = isset( $state['sent'] ) ? (int) $state['sent'] : 0;
+		$failed = isset( $state['failed'] ) ? (int) $state['failed'] : 0;
+		$period = isset( $state['period'] ) && 'last_24_hours' === $state['period']
+			? __( 'گزارش ۲۴ ساعت گذشته', JLWI_TEXT_DOMAIN )
+			: __( 'گزارش روزانه', JLWI_TEXT_DOMAIN );
+		?>
+		<p class="description jlwi-report-result">
+			<?php
+			echo esc_html(
+				sprintf(
+					__( 'آخرین اجرا: %1$s — %2$s — %3$s (موفق: %4$d، ناموفق: %5$d)', JLWI_TEXT_DOMAIN ),
+					wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $state['timestamp'], wp_timezone() ),
+					$period,
+					$status,
+					$sent,
+					$failed
+				)
+			);
+			?>
+		</p>
+		<?php if ( ! empty( $state['error'] ) ) : ?>
+			<p class="description jlwi-warning-text"><?php echo esc_html( $state['error'] ); ?></p>
+		<?php endif; ?>
+		<?php
 	}
 
 	/**
