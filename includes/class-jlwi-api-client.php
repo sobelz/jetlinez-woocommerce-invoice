@@ -45,7 +45,7 @@ final class JLWI_API_Client {
 	}
 
 	/**
-	 * Upload a PDF/document to Jetlinez media storage.
+	 * Upload a supported document or image to Jetlinez media storage.
 	 *
 	 * Jetlinez expects multipart/form-data with a field named "file".
 	 *
@@ -60,13 +60,13 @@ final class JLWI_API_Client {
 
 		$file_path = (string) $file_path;
 		if ( '' === $file_path || ! is_file( $file_path ) || ! is_readable( $file_path ) ) {
-			return new WP_Error( 'jlwi_media_not_readable', __( 'فایل فاکتور قابل خواندن نیست.', JLWI_TEXT_DOMAIN ) );
+			return new WP_Error( 'jlwi_media_not_readable', __( 'فایل مدیا قابل خواندن نیست.', JLWI_TEXT_DOMAIN ) );
 		}
 
 		$file_size = (int) filesize( $file_path );
 		$max_bytes = max( 1, (int) $this->settings['max_file_mb'] ) * MB_IN_BYTES;
 		if ( $file_size <= 0 ) {
-			return new WP_Error( 'jlwi_media_empty', __( 'فایل فاکتور خالی است.', JLWI_TEXT_DOMAIN ) );
+			return new WP_Error( 'jlwi_media_empty', __( 'فایل مدیا خالی است.', JLWI_TEXT_DOMAIN ) );
 		}
 
 		if ( $file_size > $max_bytes ) {
@@ -74,7 +74,7 @@ final class JLWI_API_Client {
 				'jlwi_media_too_large',
 				sprintf(
 					/* translators: 1: file size in MB, 2: configured limit in MB. */
-					__( 'حجم فاکتور %.2f مگابایت است و از سقف تنظیم‌شده %d مگابایت بیشتر است.', JLWI_TEXT_DOMAIN ),
+					__( 'حجم فایل مدیا %.2f مگابایت است و از سقف تنظیم‌شده %d مگابایت بیشتر است.', JLWI_TEXT_DOMAIN ),
 					$file_size / MB_IN_BYTES,
 					(int) $this->settings['max_file_mb']
 				)
@@ -83,18 +83,30 @@ final class JLWI_API_Client {
 
 		$file_contents = file_get_contents( $file_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 		if ( false === $file_contents ) {
-			return new WP_Error( 'jlwi_media_read_failed', __( 'خواندن فایل فاکتور ناموفق بود.', JLWI_TEXT_DOMAIN ) );
+			return new WP_Error( 'jlwi_media_read_failed', __( 'خواندن فایل مدیا ناموفق بود.', JLWI_TEXT_DOMAIN ) );
+		}
+
+		$signature = substr( $file_contents, 0, 8 );
+		if ( 0 === strpos( $signature, '%PDF-' ) ) {
+			$mime      = 'application/pdf';
+			$extension = 'pdf';
+		} elseif ( 0 === strpos( $signature, "\xFF\xD8\xFF" ) ) {
+			$mime      = 'image/jpeg';
+			$extension = 'jpg';
+		} else {
+			unset( $file_contents );
+			return new WP_Error( 'jlwi_media_type_unsupported', __( 'نوع فایل مدیا پشتیبانی نمی‌شود؛ فقط PDF و JPEG مجاز هستند.', JLWI_TEXT_DOMAIN ) );
 		}
 
 		$filename = sanitize_file_name( wp_basename( $file_path ) );
 		if ( '' === $filename ) {
-			$filename = 'invoice.pdf';
+			$filename = 'jetlinez-media.' . $extension;
+		} elseif ( $extension !== strtolower( (string) pathinfo( $filename, PATHINFO_EXTENSION ) ) && ! ( 'jpg' === $extension && 'jpeg' === strtolower( (string) pathinfo( $filename, PATHINFO_EXTENSION ) ) ) ) {
+			$filename = preg_replace( '/\.[^.]*$/', '', $filename ) . '.' . $extension;
 		}
 
-		// This integration uploads invoice PDFs only. Forcing application/pdf avoids
-		// server-dependent detections such as application/octet-stream, which the
-		// Jetlinez document validator does not accept for PDF invoices.
-		$mime          = 'application/pdf';
+		// Detect the two supported types from their file signatures rather than the
+		// temporary filename or server-dependent MIME databases.
 		$boundary      = '--------------------------' . str_replace( '-', '', wp_generate_uuid4() );
 		$safe_filename = str_replace( array( '"', "\r", "\n" ), '', $filename );
 		$body          = '--' . $boundary . "\r\n";

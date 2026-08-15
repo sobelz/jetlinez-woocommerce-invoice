@@ -21,6 +21,9 @@ final class JLWI_Plugin {
 	/** @var JLWI_Daily_Report|null */
 	private $daily_report = null;
 
+	/** @var JLWI_Weekly_Report|null */
+	private $weekly_report = null;
+
 	/**
 	 * Singleton accessor.
 	 *
@@ -45,6 +48,7 @@ final class JLWI_Plugin {
 		}
 
 		JLWI_Daily_Report::reschedule();
+		JLWI_Weekly_Report::reschedule();
 	}
 
 	/**
@@ -54,6 +58,7 @@ final class JLWI_Plugin {
 	 */
 	public static function deactivate() {
 		JLWI_Daily_Report::clear_schedule();
+		JLWI_Weekly_Report::clear_schedule();
 	}
 
 	/**
@@ -81,6 +86,9 @@ final class JLWI_Plugin {
 
 		$this->daily_report = new JLWI_Daily_Report();
 		$this->daily_report->register_hooks();
+
+		$this->weekly_report = new JLWI_Weekly_Report();
+		$this->weekly_report->register_hooks();
 	}
 
 	/**

@@ -75,6 +75,20 @@ final class JLWI_Settings {
 				'problem_orders',
 				'inventory_attention',
 			),
+			'weekly_report_enabled'             => 'no',
+			'weekly_report_day'                 => 6,
+			'weekly_report_time'                => '20:00',
+			'weekly_report_sections'            => array(
+				'total_sales',
+				'sales_change',
+				'orders_average',
+				'daily_sales',
+				'customer_mix',
+				'top_low_products',
+				'product_changes',
+				'problem_orders',
+				'discounts',
+			),
 			'timeout'                           => 45,
 			'max_redirects'                     => 3,
 			'max_file_mb'                       => 20,
@@ -168,6 +182,9 @@ final class JLWI_Settings {
 		$settings['delivery_modes']  = self::resolve_delivery_modes( $saved, $settings );
 		$settings['daily_report_time'] = self::sanitize_report_time( $settings['daily_report_time'] );
 		$settings['daily_report_sections'] = self::sanitize_report_sections( $settings['daily_report_sections'] );
+		$settings['weekly_report_day'] = self::sanitize_weekly_report_day( $settings['weekly_report_day'] );
+		$settings['weekly_report_time'] = self::sanitize_report_time( $settings['weekly_report_time'] );
+		$settings['weekly_report_sections'] = self::sanitize_weekly_report_sections( $settings['weekly_report_sections'] );
 
 		$constant_map = array(
 			'api_base_url' => 'JLWI_API_BASE_URL',
@@ -209,6 +226,9 @@ final class JLWI_Settings {
 		$settings['delivery_modes']  = self::resolve_delivery_modes( $saved, $settings );
 		$settings['daily_report_time'] = self::sanitize_report_time( $settings['daily_report_time'] );
 		$settings['daily_report_sections'] = self::sanitize_report_sections( $settings['daily_report_sections'] );
+		$settings['weekly_report_day'] = self::sanitize_weekly_report_day( $settings['weekly_report_day'] );
+		$settings['weekly_report_time'] = self::sanitize_report_time( $settings['weekly_report_time'] );
+		$settings['weekly_report_sections'] = self::sanitize_weekly_report_sections( $settings['weekly_report_sections'] );
 
 		return $settings;
 	}
@@ -395,6 +415,59 @@ final class JLWI_Settings {
 		}
 
 		return array_values( $sanitized );
+	}
+
+	/**
+	 * Return the supported weekly-report section keys and their labels.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function weekly_report_section_labels() {
+		return array(
+			'total_sales'      => __( 'مجموع فروش هفته', JLWI_TEXT_DOMAIN ),
+			'sales_change'     => __( 'رشد یا افت نسبت به هفته قبل', JLWI_TEXT_DOMAIN ),
+			'orders_average'   => __( 'تعداد سفارش‌ها و میانگین ارزش سفارش', JLWI_TEXT_DOMAIN ),
+			'daily_sales'      => __( 'فروش روزبه‌روز هفته', JLWI_TEXT_DOMAIN ),
+			'customer_mix'     => __( 'مشتریان جدید در مقابل مشتریان تکراری', JLWI_TEXT_DOMAIN ),
+			'top_low_products' => __( 'محصولات پرفروش و کم‌فروش', JLWI_TEXT_DOMAIN ),
+			'product_changes'  => __( 'محصولات با بیشترین رشد یا افت فروش', JLWI_TEXT_DOMAIN ),
+			'problem_orders'   => __( 'تعداد لغو، مرجوعی و پرداخت ناموفق', JLWI_TEXT_DOMAIN ),
+			'discounts'        => __( 'میزان تخفیف استفاده‌شده', JLWI_TEXT_DOMAIN ),
+		);
+	}
+
+	/**
+	 * Sanitize enabled weekly-report sections.
+	 *
+	 * @param mixed $sections Raw section list.
+	 * @return string[]
+	 */
+	public static function sanitize_weekly_report_sections( $sections ) {
+		if ( ! is_array( $sections ) ) {
+			return array();
+		}
+
+		$allowed   = self::weekly_report_section_labels();
+		$sanitized = array();
+		foreach ( $sections as $section ) {
+			$section = is_scalar( $section ) ? sanitize_key( (string) $section ) : '';
+			if ( isset( $allowed[ $section ] ) ) {
+				$sanitized[ $section ] = $section;
+			}
+		}
+
+		return array_values( $sanitized );
+	}
+
+	/**
+	 * Sanitize a weekly report weekday using PHP's 0 (Sunday) to 6 (Saturday).
+	 *
+	 * @param mixed $day Weekday number.
+	 * @return int
+	 */
+	public static function sanitize_weekly_report_day( $day ) {
+		$day = trim( self::ascii_digits( is_scalar( $day ) ? $day : '' ) );
+		return preg_match( '/^[0-6]$/', $day ) ? (int) $day : (int) self::defaults()['weekly_report_day'];
 	}
 
 	/**

@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Jetlinez Invoice for WooCommerce
  * Plugin URI:  https://my.jetlinez.com
- * Description: ارسال خودکار وضعیت سفارش، فاکتور PDF و گزارش روزانه ووکامرس از طریق واتساپ جتلاینز، با پشتیبانی از PeproDev Ultimate Invoice و حالت جایگزین متنی.
- * Version:     1.5.0
+ * Description: ارسال خودکار وضعیت سفارش، فاکتور PDF و گزارش‌های روزانه و هفتگی ووکامرس از طریق واتساپ جتلاینز، با پشتیبانی از PeproDev Ultimate Invoice و حالت جایگزین متنی.
+ * Version:     1.7.0
  * Author:      Jetlinez
  * Author URI:  https://my.jetlinez.com
  * Update URI:  https://plugins.sobelz.ir/jetlinez-woocommerce-invoice
@@ -19,12 +19,13 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'JLWI_VERSION', '1.5.0' );
+define( 'JLWI_VERSION', '1.7.0' );
 define( 'JLWI_FILE', __FILE__ );
 define( 'JLWI_DIR', plugin_dir_path( __FILE__ ) );
 define( 'JLWI_URL', plugin_dir_url( __FILE__ ) );
 define( 'JLWI_OPTION', 'jlwi_settings' );
 define( 'JLWI_REPORT_STATE_OPTION', 'jlwi_daily_report_state' );
+define( 'JLWI_WEEKLY_REPORT_STATE_OPTION', 'jlwi_weekly_report_state' );
 define( 'JLWI_TEXT_DOMAIN', 'jetlinez-woocommerce-invoice' );
 
 require_once JLWI_DIR . 'includes/updater/class-sobelz-plugin-updater.php';
@@ -33,6 +34,7 @@ require_once JLWI_DIR . 'includes/class-jlwi-api-client.php';
 require_once JLWI_DIR . 'includes/class-jlwi-template.php';
 require_once JLWI_DIR . 'includes/class-jlwi-sender.php';
 require_once JLWI_DIR . 'includes/class-jlwi-daily-report.php';
+require_once JLWI_DIR . 'includes/class-jlwi-weekly-report.php';
 require_once JLWI_DIR . 'includes/class-jlwi-admin.php';
 require_once JLWI_DIR . 'includes/class-jlwi-plugin.php';
 
