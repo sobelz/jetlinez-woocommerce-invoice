@@ -215,7 +215,7 @@ final class JLWI_Daily_Report {
 			$yesterday_end       = $yesterday_start->modify( '+' . $elapsed_seconds . ' seconds' );
 		}
 
-		$order_sections      = array( 'sales', 'orders', 'average_order', 'problem_orders' );
+		$order_sections      = array( 'sales', 'orders', 'average_order', 'new_customers', 'problem_orders' );
 		$needs_today_orders  = ! empty( array_intersect( $sections, $order_sections ) );
 		$today_orders        = $needs_today_orders ? $this->orders_between( $today_start, $now ) : array();
 		$yesterday_orders    = in_array( 'sales', $sections, true ) ? $this->orders_between( $yesterday_start, $yesterday_end ) : array();
@@ -230,7 +230,9 @@ final class JLWI_Daily_Report {
 			'yesterday_end'      => $yesterday_end,
 			'today'              => $today,
 			'yesterday'          => $yesterday,
-			'new_customers'      => in_array( 'new_customers', $sections, true ) ? $this->new_customer_count( $today_start, $now ) : 0,
+			'new_customers'      => in_array( 'new_customers', $sections, true )
+				? JLWI_Report_Customers::mix( $today_orders, $today_start, 'daily' )['new']
+				: 0,
 			'inventory_attention' => in_array( 'inventory_attention', $sections, true ) ? $this->inventory_attention() : array(),
 		);
 
@@ -394,8 +396,7 @@ final class JLWI_Daily_Report {
 	 */
 	private function summarize_orders( $orders, $now ) {
 		$currency      = function_exists( 'get_woocommerce_currency' ) ? (string) get_woocommerce_currency() : '';
-		$paid_statuses = function_exists( 'wc_get_is_paid_statuses' ) ? wc_get_is_paid_statuses() : array( 'processing', 'completed' );
-		$paid_statuses = array_map( array( 'JLWI_Settings', 'normalize_status' ), (array) $paid_statuses );
+		$paid_statuses = JLWI_Report_Customers::paid_statuses();
 		$hold_minutes  = (int) get_option( 'woocommerce_hold_stock_minutes', 60 );
 		$hold_minutes  = $hold_minutes > 0 ? $hold_minutes : 60;
 		$hold_minutes  = max( 1, (int) apply_filters( 'jlwi_daily_report_abandoned_after_minutes', $hold_minutes ) );
@@ -446,39 +447,6 @@ final class JLWI_Daily_Report {
 		}
 
 		return $summary;
-	}
-
-	/**
-	 * Count newly registered WooCommerce customer accounts in the interval.
-	 *
-	 * @param DateTimeInterface $start Start time.
-	 * @param DateTimeInterface $end   End time.
-	 * @return int
-	 */
-	private function new_customer_count( $start, $end ) {
-		if ( ! class_exists( 'WP_User_Query' ) ) {
-			return 0;
-		}
-
-		$roles = apply_filters( 'jlwi_daily_report_customer_roles', array( 'customer' ) );
-		$roles = is_array( $roles ) ? array_filter( array_map( 'sanitize_key', $roles ) ) : array( 'customer' );
-		$query = new WP_User_Query(
-			array(
-				'role__in'    => $roles,
-				'fields'      => 'ID',
-				'number'      => 1,
-				'count_total' => true,
-				'date_query'  => array(
-					array(
-						'after'     => gmdate( 'Y-m-d H:i:s', $start->getTimestamp() ),
-						'before'    => gmdate( 'Y-m-d H:i:s', $end->getTimestamp() ),
-						'inclusive' => true,
-					),
-				),
-			)
-		);
-
-		return (int) $query->get_total();
 	}
 
 	/**

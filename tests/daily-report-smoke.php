@@ -15,6 +15,7 @@ $GLOBALS['jlwi_test_options']    = array();
 $GLOBALS['jlwi_test_transients'] = array();
 $GLOBALS['jlwi_test_messages']   = array();
 $GLOBALS['jlwi_test_cron']       = false;
+$GLOBALS['jlwi_daily_previous_customer_queries'] = array();
 
 function get_option( $key, $default = false ) {
 	if ( JLWI_OPTION === $key ) {
@@ -114,13 +115,18 @@ function wc_get_is_paid_statuses() {
 }
 
 function wc_get_orders( $args ) {
+	if ( isset( $args['return'] ) && 'ids' === $args['return'] ) {
+		$GLOBALS['jlwi_daily_previous_customer_queries'][] = $args;
+		return isset( $args['customer_id'] ) && 1 === (int) $args['customer_id'] ? array( 99 ) : array();
+	}
+
 	list( $start ) = explode( '...', $args['date_created'] );
 	$start_time = wp_date( 'Y-m-d H:i:s', (int) $start, wp_timezone() );
 	$day        = substr( $start_time, 0, 10 );
 	if ( '2026-08-15' === $day ) {
 		$orders = array(
-			new JLWI_Test_Report_Order( 'processing', 1000, 0, '2026-08-15 10:00:00' ),
-			new JLWI_Test_Report_Order( 'completed', 2000, 500, '2026-08-15 11:00:00' ),
+			new JLWI_Test_Report_Order( 'processing', 1000, 0, '2026-08-15 10:00:00', 1 ),
+			new JLWI_Test_Report_Order( 'completed', 2000, 500, '2026-08-15 11:00:00', 2 ),
 			new JLWI_Test_Report_Order( 'cancelled', 400, 0, '2026-08-15 12:00:00' ),
 			new JLWI_Test_Report_Order( 'failed', 300, 0, '2026-08-15 13:00:00' ),
 			new JLWI_Test_Report_Order( 'pending', 100, 0, '2026-08-15 14:00:00' ),
@@ -132,7 +138,7 @@ function wc_get_orders( $args ) {
 		);
 	} elseif ( '2026-08-14 20:00:00' === $start_time ) {
 		$orders = array(
-			new JLWI_Test_Report_Order( 'processing', 4000, 0, '2026-08-15 08:00:00' ),
+			new JLWI_Test_Report_Order( 'processing', 4000, 0, '2026-08-15 08:00:00', 2 ),
 		);
 	} else {
 		$orders = array(
@@ -210,12 +216,17 @@ class WP_User_Query {
 }
 
 class JLWI_Test_Report_Order {
+	private static $next_id = 1;
+	private $id;
+	private $customer_id;
 	private $status;
 	private $total;
 	private $refunded;
 	private $created;
 
-	public function __construct( $status, $total, $refunded, $created ) {
+	public function __construct( $status, $total, $refunded, $created, $customer_id = 0 ) {
+		$this->id       = self::$next_id++;
+		$this->customer_id = (int) $customer_id;
 		$this->status   = $status;
 		$this->total    = $total;
 		$this->refunded = $refunded;
@@ -224,6 +235,14 @@ class JLWI_Test_Report_Order {
 
 	public function get_status() {
 		return $this->status;
+	}
+
+	public function get_id() {
+		return $this->id;
+	}
+
+	public function get_customer_id() {
+		return $this->customer_id;
 	}
 
 	public function get_total() {
@@ -312,6 +331,7 @@ class JLWI_API_Client {
 $wpdb = new JLWI_Test_WPDB();
 
 require dirname( __DIR__ ) . '/includes/class-jlwi-settings.php';
+require dirname( __DIR__ ) . '/includes/class-jlwi-report-customers.php';
 require dirname( __DIR__ ) . '/includes/class-jlwi-daily-report.php';
 
 $settings = array_merge(
@@ -336,7 +356,11 @@ jlwi_test_assert( false !== strpos( $message, '2,500 IRR' ), 'Net sales were not
 jlwi_test_assert( false !== strpos( $message, '-16.7%' ), 'Yesterday comparison was not calculated correctly.' );
 jlwi_test_assert( false !== strpos( $message, 'تعداد سفارش‌ها: 5' ), 'Order count is missing or incorrect.' );
 jlwi_test_assert( false !== strpos( $message, '1,250 IRR' ), 'Average paid order value is incorrect.' );
-jlwi_test_assert( false !== strpos( $message, 'مشتری جدید: 3' ), 'New customer count is incorrect.' );
+jlwi_test_assert( false !== strpos( $message, 'مشتری جدید: 1' ), 'First-time paid customer count is incorrect.' );
+jlwi_test_assert( ! empty( $GLOBALS['jlwi_daily_previous_customer_queries'] ), 'Previous-customer lookup was not performed.' );
+foreach ( $GLOBALS['jlwi_daily_previous_customer_queries'] as $previous_query ) {
+	jlwi_test_assert( 1 === preg_match( '/^<\d+$/', $previous_query['date_created'] ), 'Daily previous-customer lookup used invalid WooCommerce date syntax.' );
+}
 jlwi_test_assert( false !== strpos( $message, 'لغوشده: 1' ), 'Cancelled order count is incorrect.' );
 jlwi_test_assert( false !== strpos( $message, 'مرجوع/بازپرداخت‌شده: 1' ), 'Refunded order count is incorrect.' );
 jlwi_test_assert( false !== strpos( $message, 'رهاشده: 2' ), 'Abandoned order count is incorrect.' );
@@ -355,6 +379,10 @@ $orders_only = $report->build_message();
 jlwi_test_assert( false !== strpos( $orders_only, 'تعداد سفارش‌ها: 5' ), 'Selected order section was omitted.' );
 jlwi_test_assert( false === strpos( $orders_only, 'فروش امروز:' ), 'Disabled sales section was rendered.' );
 jlwi_test_assert( false === strpos( $orders_only, 'موجودی نیازمند توجه' ), 'Disabled inventory section was rendered.' );
+
+$GLOBALS['jlwi_test_options'][ JLWI_OPTION ]['daily_report_sections'] = array( 'new_customers' );
+$customers_only = $report->build_message();
+jlwi_test_assert( false !== strpos( $customers_only, 'مشتری جدید: 1' ), 'Customer-only report did not load paid orders.' );
 
 $GLOBALS['jlwi_test_options'][ JLWI_OPTION ]['daily_report_sections'] = $settings['daily_report_sections'];
 $delivery = $report->send_now( 'last_24_hours' );

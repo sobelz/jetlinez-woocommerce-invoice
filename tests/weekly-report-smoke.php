@@ -21,6 +21,8 @@ $GLOBALS['jlwi_quickchart_mode']    = 'success';
 $GLOBALS['jlwi_quickchart_requests'] = array();
 $GLOBALS['jlwi_weekly_uploads']    = array();
 $GLOBALS['jlwi_weekly_upload_mode'] = 'success';
+$GLOBALS['jlwi_weekly_previous_customer_queries'] = array();
+$GLOBALS['jlwi_weekly_localize_internal_date'] = false;
 
 function get_option( $key, $default = false ) {
 	if ( JLWI_OPTION === $key || JLWI_WEEKLY_REPORT_STATE_OPTION === $key ) {
@@ -82,6 +84,9 @@ function wp_timezone() {
 
 function wp_date( $format, $timestamp, $timezone = null ) {
 	$date = new DateTimeImmutable( '@' . (int) $timestamp );
+	if ( $GLOBALS['jlwi_weekly_localize_internal_date'] && 'Y-m-d' === $format ) {
+		return '1405-05-' . $date->setTimezone( $timezone ?: wp_timezone() )->format( 'd' );
+	}
 	return $date->setTimezone( $timezone ?: wp_timezone() )->format( $format );
 }
 
@@ -166,11 +171,12 @@ function wc_get_is_paid_statuses() {
 
 function wc_get_orders( $args ) {
 	if ( isset( $args['return'] ) && 'ids' === $args['return'] ) {
+		$GLOBALS['jlwi_weekly_previous_customer_queries'][] = $args;
 		return isset( $args['customer_id'] ) && 1 === (int) $args['customer_id'] ? array( 99 ) : array();
 	}
 
 	list( $start ) = explode( '...', $args['date_created'] );
-	$start_date = wp_date( 'Y-m-d', (int) $start, wp_timezone() );
+	$start_date = ( new DateTimeImmutable( '@' . (int) $start ) )->setTimezone( wp_timezone() )->format( 'Y-m-d' );
 	if ( '2026-08-08' === $start_date ) {
 		$orders = array(
 			new JLWI_Weekly_Test_Order( 1, 'processing', 1000, 0, 100, '2026-08-08 10:00:00', array(
@@ -407,6 +413,7 @@ class JLWI_API_Client {
 }
 
 require dirname( __DIR__ ) . '/includes/class-jlwi-settings.php';
+require dirname( __DIR__ ) . '/includes/class-jlwi-report-customers.php';
 require dirname( __DIR__ ) . '/includes/class-jlwi-weekly-report.php';
 
 $settings = array_merge(
@@ -433,6 +440,10 @@ jlwi_weekly_assert( false !== strpos( $message, '1,833 IRR' ), 'Weekly average o
 jlwi_weekly_assert( false !== strpos( $message, '2026-08-08: 1,000 IRR' ), 'Daily sales breakdown is incorrect.' );
 jlwi_weekly_assert( false !== strpos( $message, 'مشتری جدید: 1' ), 'New customer count is incorrect.' );
 jlwi_weekly_assert( false !== strpos( $message, 'مشتری تکراری: 1' ), 'Returning customer count is incorrect.' );
+jlwi_weekly_assert( ! empty( $GLOBALS['jlwi_weekly_previous_customer_queries'] ), 'Previous-customer lookup was not performed.' );
+foreach ( $GLOBALS['jlwi_weekly_previous_customer_queries'] as $previous_query ) {
+	jlwi_weekly_assert( 1 === preg_match( '/^<\d+$/', $previous_query['date_created'] ), 'Weekly previous-customer lookup used invalid WooCommerce date syntax.' );
+}
 jlwi_weekly_assert( false !== strpos( $message, 'Product A — 4 عدد — 2,100 IRR' ), 'Top-selling product metrics are incorrect.' );
 jlwi_weekly_assert( false !== strpos( $message, 'Product B — 1 عدد — 200 IRR' ), 'Low-selling product metrics are incorrect.' );
 jlwi_weekly_assert( false !== strpos( $message, 'Product D — رشد جدید' ), 'Largest product growth is missing.' );
@@ -441,6 +452,11 @@ jlwi_weekly_assert( false !== strpos( $message, 'لغوشده: 1' ), 'Cancelled 
 jlwi_weekly_assert( false !== strpos( $message, 'مرجوع/بازپرداخت‌شده: 2' ), 'Refunded order count is incorrect.' );
 jlwi_weekly_assert( false !== strpos( $message, 'پرداخت ناموفق: 1' ), 'Failed payment count is incorrect.' );
 jlwi_weekly_assert( false !== strpos( $message, '300 IRR' ), 'Weekly discount total is incorrect.' );
+
+$GLOBALS['jlwi_weekly_localize_internal_date'] = true;
+$localized_message = $report->build_message();
+jlwi_weekly_assert( false !== strpos( $localized_message, '2026-08-08: 1,000 IRR' ), 'Localized wp_date output broke the internal daily-sales aggregation.' );
+$GLOBALS['jlwi_weekly_localize_internal_date'] = false;
 
 $GLOBALS['jlwi_weekly_options'][ JLWI_OPTION ]['weekly_report_sections'] = array( 'orders_average' );
 $orders_only = $report->build_message();

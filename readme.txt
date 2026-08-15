@@ -4,7 +4,7 @@ Tags: woocommerce, whatsapp, invoice, pdf, jetlinez, order status
 Requires at least: 6.2
 Requires PHP: 7.4
 WC requires at least: 7.0
-Stable tag: 1.7.0
+Stable tag: 1.7.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,7 +75,9 @@ WooCommerce > Status > Logs و سپس منبع `jetlinez-invoice` را انتخ�
 
 = گزارش روزانه چه داده‌هایی را می‌فرستد؟ =
 
-فروش خالص امروز و تغییر نسبت به بازه مشابه دیروز، تعداد سفارش‌ها، میانگین سفارش‌های پرداخت‌شده، حساب‌های مشتری جدید، سفارش‌های لغو/بازپرداخت/رهاشده و موجودی‌های نیازمند توجه. هر بخش از پنل قابل غیرفعال‌کردن است و گزارش از همان دستگاه واتساپ و شماره‌های ثابت ادمین استفاده می‌کند. دکمه ارسال فوری همین شاخص‌ها را برای ۲۴ ساعت گذشته محاسبه و با ۲۴ ساعت قبل از آن مقایسه می‌کند.
+فروش خالص امروز و تغییر نسبت به بازه مشابه دیروز، تعداد سفارش‌ها، میانگین سفارش‌های پرداخت‌شده، مشتریان یکتای دارای اولین سفارش پرداخت‌شده، سفارش‌های لغو/بازپرداخت/رهاشده و موجودی‌های نیازمند توجه. هر بخش از پنل قابل غیرفعال‌کردن است و گزارش از همان دستگاه واتساپ و شماره‌های ثابت ادمین استفاده می‌کند. دکمه ارسال فوری همین شاخص‌ها را برای ۲۴ ساعت گذشته محاسبه و با ۲۴ ساعت قبل از آن مقایسه می‌کند.
+
+تعریف مشتری جدید در گزارش روزانه و هفتگی یکسان است: مشتری‌ای که پیش از شروع بازه سفارش پرداخت‌شده نداشته باشد. مشتریان مهمان با ایمیل صورتحساب و در نبود آن با شماره تلفن تطبیق داده می‌شوند.
 
 سفارش رهاشده یعنی سفارش ناموفق یا سفارش در انتظار پرداختی که از مهلت نگهداری موجودی ووکامرس قدیمی‌تر است؛ در صورت غیرفعال‌بودن آن مهلت، ۶۰ دقیقه استفاده می‌شود. WP-Cron در اولین بازدید بعد از ساعت تعیین‌شده اجرا می‌شود.
 
@@ -119,7 +121,10 @@ WooCommerce > Status > Logs و سپس منبع `jetlinez-invoice` را انتخ�
 * `jlwi_daily_report_order_query_args`
 * `jlwi_daily_report_inventory_attention`
 * `jlwi_daily_report_abandoned_after_minutes`
-* `jlwi_daily_report_customer_roles`
+* `jlwi_report_previous_customer_query_args`
+* `jlwi_report_customer_is_new`
+* `jlwi_daily_report_previous_customer_query_args`
+* `jlwi_daily_report_customer_is_new`
 * `jlwi_daily_report_inventory_limit`
 * `jlwi_max_daily_report_recipients`
 * `jlwi_weekly_report_recipients`
@@ -133,6 +138,12 @@ WooCommerce > Status > Logs و سپس منبع `jetlinez-invoice` را انتخ�
 * `jlwi_max_weekly_report_recipients`
 
 == Changelog ==
+
+= 1.7.1 =
+
+* رفع صفرشدن فروش روزبه‌روز گزارش هفتگی در سایت‌های دارای تقویم شمسی یا فیلتر تاریخ.
+* اصلاح سینتکس جست‌وجوی سفارش‌های پیشین مشتری و محاسبه صحیح مشتری جدید/تکراری.
+* یکسان‌سازی تعریف مشتری جدید در گزارش روزانه و هفتگی بر اساس اولین سفارش پرداخت‌شده.
 
 = 1.7.0 =
 

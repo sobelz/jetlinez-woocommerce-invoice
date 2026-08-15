@@ -288,7 +288,7 @@ final class JLWI_Weekly_Report {
 			'current'        => $current,
 			'previous'       => $previous,
 			'customer_mix'   => in_array( 'customer_mix', $sections, true )
-				? $this->customer_mix( $current_orders, $current_start )
+				? JLWI_Report_Customers::mix( $current_orders, $current_start, 'weekly' )
 				: array( 'new' => 0, 'returning' => 0 ),
 		);
 
@@ -445,7 +445,7 @@ final class JLWI_Weekly_Report {
 	 */
 	private function summarize_orders( $orders, $start, $end ) {
 		$currency      = function_exists( 'get_woocommerce_currency' ) ? (string) get_woocommerce_currency() : '';
-		$paid_statuses = $this->paid_statuses();
+		$paid_statuses = JLWI_Report_Customers::paid_statuses();
 		$daily_sales   = array();
 		$cursor        = $start;
 		while ( $cursor->getTimestamp() <= $end->getTimestamp() ) {
@@ -511,7 +511,7 @@ final class JLWI_Weekly_Report {
 
 			$created = method_exists( $order, 'get_date_created' ) ? $order->get_date_created() : null;
 			$day     = $created && method_exists( $created, 'getTimestamp' )
-				? wp_date( 'Y-m-d', $created->getTimestamp(), wp_timezone() )
+				? $this->internal_date_key( $created->getTimestamp() )
 				: '';
 			if ( isset( $summary['daily_sales'][ $day ] ) ) {
 				if ( ! isset( $summary['daily_sales'][ $day ][ $order_currency ] ) ) {
@@ -579,106 +579,17 @@ final class JLWI_Weekly_Report {
 	}
 
 	/**
-	 * Count unique first-time and returning paid customers in the current week.
+	 * Build an unlocalized Gregorian key for internal day aggregation.
 	 *
-	 * @param array             $orders Orders in the report interval.
-	 * @param DateTimeInterface $start  Report start.
-	 * @return array{new:int,returning:int}
-	 */
-	private function customer_mix( $orders, $start ) {
-		$customers = array();
-		foreach ( $orders as $order ) {
-			if ( ! is_object( $order ) || ! method_exists( $order, 'get_status' ) || ! in_array( JLWI_Settings::normalize_status( $order->get_status() ), $this->paid_statuses(), true ) ) {
-				continue;
-			}
-
-			$identity = $this->customer_identity( $order );
-			if ( ! empty( $identity['key'] ) ) {
-				$customers[ $identity['key'] ] = $identity;
-			}
-		}
-
-		$mix = array( 'new' => 0, 'returning' => 0 );
-		foreach ( $customers as $identity ) {
-			$is_new = ! $this->customer_had_paid_order_before( $identity, $start );
-			$is_new = (bool) apply_filters( 'jlwi_weekly_report_customer_is_new', $is_new, $identity, $start );
-			if ( $is_new ) {
-				++$mix['new'];
-			} else {
-				++$mix['returning'];
-			}
-		}
-
-		return $mix;
-	}
-
-	/**
-	 * Build a stable registered or guest customer identity from an order.
+	 * Display dates still pass through wp_date(), but array keys must not be
+	 * changed by Jalali/local-calendar filters.
 	 *
-	 * @param object $order WooCommerce order.
-	 * @return array
+	 * @param int $timestamp Unix timestamp.
+	 * @return string
 	 */
-	private function customer_identity( $order ) {
-		$customer_id = method_exists( $order, 'get_customer_id' ) ? (int) $order->get_customer_id() : 0;
-		if ( $customer_id > 0 ) {
-			return array( 'key' => 'user:' . $customer_id, 'query_key' => 'customer_id', 'query_value' => $customer_id );
-		}
-
-		$email = method_exists( $order, 'get_billing_email' ) ? strtolower( trim( (string) $order->get_billing_email() ) ) : '';
-		if ( '' !== $email ) {
-			return array( 'key' => 'email:' . $email, 'query_key' => 'billing_email', 'query_value' => $email );
-		}
-
-		$phone = method_exists( $order, 'get_billing_phone' ) ? preg_replace( '/\D+/', '', JLWI_Settings::ascii_digits( $order->get_billing_phone() ) ) : '';
-		if ( '' !== $phone ) {
-			return array( 'key' => 'phone:' . $phone, 'query_key' => 'billing_phone', 'query_value' => $phone );
-		}
-
-		$order_id = method_exists( $order, 'get_id' ) ? (int) $order->get_id() : 0;
-		return array( 'key' => 'anonymous:' . $order_id, 'query_key' => '', 'query_value' => '' );
-	}
-
-	/**
-	 * Check for a paid order strictly before the current report interval.
-	 *
-	 * @param array             $identity Customer identity.
-	 * @param DateTimeInterface $start    Current period start.
-	 * @return bool
-	 */
-	private function customer_had_paid_order_before( $identity, $start ) {
-		if ( empty( $identity['query_key'] ) ) {
-			return false;
-		}
-
-		$args = array(
-			'type'         => 'shop_order',
-			'status'       => $this->paid_statuses(),
-			'date_created' => '...' . ( $start->getTimestamp() - 1 ),
-			'limit'        => 1,
-			'paginate'     => false,
-			'return'       => 'ids',
-			'orderby'      => 'date',
-			'order'        => 'DESC',
-		);
-		$args[ $identity['query_key'] ] = $identity['query_value'];
-		$args = apply_filters( 'jlwi_weekly_report_previous_customer_query_args', $args, $identity, $start );
-		$result = wc_get_orders( is_array( $args ) ? $args : array() );
-
-		if ( is_array( $result ) ) {
-			return ! empty( $result );
-		}
-
-		return is_object( $result ) && isset( $result->orders ) && ! empty( $result->orders );
-	}
-
-	/**
-	 * Return normalized paid-order statuses.
-	 *
-	 * @return string[]
-	 */
-	private function paid_statuses() {
-		$statuses = function_exists( 'wc_get_is_paid_statuses' ) ? wc_get_is_paid_statuses() : array( 'processing', 'completed' );
-		return array_map( array( 'JLWI_Settings', 'normalize_status' ), (array) $statuses );
+	private function internal_date_key( $timestamp ) {
+		$date = new DateTimeImmutable( '@' . (int) $timestamp );
+		return $date->setTimezone( wp_timezone() )->format( 'Y-m-d' );
 	}
 
 	/**
