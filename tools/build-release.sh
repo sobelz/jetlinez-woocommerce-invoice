@@ -32,7 +32,7 @@ output_file="${1:-$repo_root/$slug.zip}"
 temp_file="$(mktemp "${TMPDIR:-/tmp}/${slug}.XXXXXX.zip")"
 trap 'rm -f "$temp_file"' EXIT
 
-git --git-dir="$git_dir" -C "$repo_root" archive \
+git --git-dir="$git_dir" archive \
 	--format=zip \
 	--prefix="$slug/" \
 	--output="$temp_file" \
