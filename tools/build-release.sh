@@ -3,7 +3,13 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-git_dir="$repo_root"
+
+if [[ $# -eq 0 ]]; then
+	git_dir="${repo_root}.git"
+else
+	git_dir=$1
+fi
+
 plugin_file="$repo_root/jetlinez-woocommerce-invoice.php"
 manifest_file="$repo_root/update.json"
 slug="jetlinez-woocommerce-invoice"
