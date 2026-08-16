@@ -169,6 +169,20 @@ $legacy = JLWI_Settings::raw();
 jlwi_test_assert( 'file' === $legacy['delivery_modes']['processing']['customer'], 'Legacy file-only settings were not migrated.' );
 jlwi_test_assert( 'file' === $legacy['delivery_modes']['completed']['admin'], 'Legacy mode should apply to both audiences.' );
 
+$GLOBALS['jlwi_test_option'] = array( 'fixed_recipients' => '09121234567' );
+$legacy_recipients           = JLWI_Settings::raw();
+jlwi_test_assert( '09121234567' === $legacy_recipients['report_recipients'], 'Legacy invoice recipients were not migrated to the report recipient list.' );
+
+$GLOBALS['jlwi_test_option'] = array_merge(
+	$defaults,
+	array(
+		'fixed_recipients'  => '09121234567',
+		'report_recipients' => '09351234567',
+	)
+);
+$separate_recipients = JLWI_Settings::raw();
+jlwi_test_assert( '09351234567' === $separate_recipients['report_recipients'], 'Explicit report recipients were replaced by invoice recipients.' );
+
 $GLOBALS['jlwi_test_option'] = array_merge(
 	$defaults,
 	array(

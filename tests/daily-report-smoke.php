@@ -339,7 +339,8 @@ $settings = array_merge(
 	array(
 		'api_key'              => 'test-key',
 		'device_id'            => 'test-device',
-		'fixed_recipients'     => "09121234567\n989121234567\n09351234567",
+		'fixed_recipients'     => '09111111111',
+		'report_recipients'    => "09121234567\n989121234567\n09351234567",
 		'daily_report_enabled' => 'yes',
 	)
 );
@@ -389,6 +390,9 @@ $delivery = $report->send_now( 'last_24_hours' );
 jlwi_test_assert( ! is_wp_error( $delivery ), 'Daily report delivery returned an error.' );
 jlwi_test_assert( 2 === $delivery['sent'], 'Daily report recipients were not normalized and deduplicated.' );
 jlwi_test_assert( 2 === count( $GLOBALS['jlwi_test_messages'] ), 'Unexpected daily report message count.' );
+foreach ( $GLOBALS['jlwi_test_messages'] as $sent_message ) {
+	jlwi_test_assert( '989111111111' !== $sent_message[0], 'Daily report was sent to an invoice recipient.' );
+}
 jlwi_test_assert( false !== strpos( $delivery['message'], 'گزارش ۲۴ ساعت گذشته فروشگاه' ), 'Immediate delivery did not use the rolling report.' );
 jlwi_test_assert( 'last_24_hours' === $GLOBALS['jlwi_test_options'][ JLWI_REPORT_STATE_OPTION ]['period'], 'Last report state did not retain the rolling period.' );
 
@@ -396,5 +400,9 @@ $GLOBALS['jlwi_test_options'][ JLWI_OPTION ]['daily_report_time'] = '21:15';
 JLWI_Daily_Report::reschedule();
 jlwi_test_assert( false !== $GLOBALS['jlwi_test_cron'], 'Daily report cron event was not scheduled.' );
 jlwi_test_assert( '21:15' === wp_date( 'H:i', $GLOBALS['jlwi_test_cron'], wp_timezone() ), 'Cron event did not preserve the configured local time.' );
+
+$GLOBALS['jlwi_test_options'][ JLWI_OPTION ]['report_recipients'] = '';
+JLWI_Daily_Report::reschedule();
+jlwi_test_assert( false === $GLOBALS['jlwi_test_cron'], 'Daily report cron remained scheduled without report recipients.' );
 
 fwrite( STDOUT, "Daily report smoke test passed.\n" );

@@ -43,6 +43,7 @@ final class JLWI_Settings {
 			'enable_processing'                 => 'yes',
 			'enable_completed'                  => 'yes',
 			'fixed_recipients'                  => '',
+			'report_recipients'                 => '',
 			'include_billing_phone'              => 'no',
 			'default_country_code'              => '98',
 			'delivery_modes'                    => array(
@@ -177,13 +178,14 @@ final class JLWI_Settings {
 	public static function all() {
 		$saved    = get_option( JLWI_OPTION, array() );
 		$saved    = is_array( $saved ) ? $saved : array();
-		$settings = wp_parse_args( $saved, self::defaults() );
-		$settings['target_statuses'] = self::resolve_target_statuses( $saved, $settings );
-		$settings['delivery_modes']  = self::resolve_delivery_modes( $saved, $settings );
-		$settings['daily_report_time'] = self::sanitize_report_time( $settings['daily_report_time'] );
-		$settings['daily_report_sections'] = self::sanitize_report_sections( $settings['daily_report_sections'] );
-		$settings['weekly_report_day'] = self::sanitize_weekly_report_day( $settings['weekly_report_day'] );
-		$settings['weekly_report_time'] = self::sanitize_report_time( $settings['weekly_report_time'] );
+		$settings                            = wp_parse_args( $saved, self::defaults() );
+		$settings['target_statuses']         = self::resolve_target_statuses( $saved, $settings );
+		$settings['delivery_modes']          = self::resolve_delivery_modes( $saved, $settings );
+		$settings['report_recipients']       = self::resolve_report_recipients( $saved, $settings );
+		$settings['daily_report_time']       = self::sanitize_report_time( $settings['daily_report_time'] );
+		$settings['daily_report_sections']   = self::sanitize_report_sections( $settings['daily_report_sections'] );
+		$settings['weekly_report_day']       = self::sanitize_weekly_report_day( $settings['weekly_report_day'] );
+		$settings['weekly_report_time']      = self::sanitize_report_time( $settings['weekly_report_time'] );
 		$settings['weekly_report_sections'] = self::sanitize_weekly_report_sections( $settings['weekly_report_sections'] );
 
 		$constant_map = array(
@@ -221,13 +223,14 @@ final class JLWI_Settings {
 	public static function raw() {
 		$saved    = get_option( JLWI_OPTION, array() );
 		$saved    = is_array( $saved ) ? $saved : array();
-		$settings = wp_parse_args( $saved, self::defaults() );
-		$settings['target_statuses'] = self::resolve_target_statuses( $saved, $settings );
-		$settings['delivery_modes']  = self::resolve_delivery_modes( $saved, $settings );
-		$settings['daily_report_time'] = self::sanitize_report_time( $settings['daily_report_time'] );
-		$settings['daily_report_sections'] = self::sanitize_report_sections( $settings['daily_report_sections'] );
-		$settings['weekly_report_day'] = self::sanitize_weekly_report_day( $settings['weekly_report_day'] );
-		$settings['weekly_report_time'] = self::sanitize_report_time( $settings['weekly_report_time'] );
+		$settings                            = wp_parse_args( $saved, self::defaults() );
+		$settings['target_statuses']         = self::resolve_target_statuses( $saved, $settings );
+		$settings['delivery_modes']          = self::resolve_delivery_modes( $saved, $settings );
+		$settings['report_recipients']       = self::resolve_report_recipients( $saved, $settings );
+		$settings['daily_report_time']       = self::sanitize_report_time( $settings['daily_report_time'] );
+		$settings['daily_report_sections']   = self::sanitize_report_sections( $settings['daily_report_sections'] );
+		$settings['weekly_report_day']       = self::sanitize_weekly_report_day( $settings['weekly_report_day'] );
+		$settings['weekly_report_time']      = self::sanitize_report_time( $settings['weekly_report_time'] );
 		$settings['weekly_report_sections'] = self::sanitize_weekly_report_sections( $settings['weekly_report_sections'] );
 
 		return $settings;
@@ -522,6 +525,22 @@ final class JLWI_Settings {
 		}
 
 		return $modes;
+	}
+
+	/**
+	 * Resolve dedicated report recipients for installations created before the
+	 * report and invoice recipient lists were separated.
+	 *
+	 * @param array $saved    Raw saved settings.
+	 * @param array $settings Settings merged with defaults.
+	 * @return string
+	 */
+	private static function resolve_report_recipients( $saved, $settings ) {
+		if ( array_key_exists( 'report_recipients', $saved ) ) {
+			return (string) $saved['report_recipients'];
+		}
+
+		return isset( $settings['fixed_recipients'] ) ? (string) $settings['fixed_recipients'] : '';
 	}
 
 	/**

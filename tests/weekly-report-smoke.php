@@ -421,7 +421,8 @@ $settings = array_merge(
 	array(
 		'api_key'               => 'test-key',
 		'device_id'             => 'test-device',
-		'fixed_recipients'      => "09121234567\n989121234567\n09351234567",
+		'fixed_recipients'      => '09111111111',
+		'report_recipients'     => "09121234567\n989121234567\n09351234567",
 		'weekly_report_enabled' => 'yes',
 	)
 );
@@ -477,6 +478,9 @@ jlwi_weekly_assert( ! is_wp_error( $delivery ), 'Weekly report delivery returned
 jlwi_weekly_assert( 2 === $delivery['sent'], 'Weekly report recipients were not normalized and deduplicated.' );
 jlwi_weekly_assert( 2 === $delivery['chart_sent'], 'Weekly change chart was not delivered to every text recipient.' );
 jlwi_weekly_assert( 4 === count( $GLOBALS['jlwi_weekly_messages'] ), 'Expected two text messages and two chart messages.' );
+foreach ( $GLOBALS['jlwi_weekly_messages'] as $sent_message ) {
+	jlwi_weekly_assert( '989111111111' !== $sent_message['phone'], 'Weekly report was sent to an invoice recipient.' );
+}
 jlwi_weekly_assert( 1 === count( $GLOBALS['jlwi_quickchart_requests'] ), 'QuickChart should be requested once per report.' );
 jlwi_weekly_assert( 1 === count( $GLOBALS['jlwi_weekly_uploads'] ), 'The weekly chart should be uploaded once.' );
 jlwi_weekly_assert( "\xFF\xD8\xFF" === $GLOBALS['jlwi_weekly_uploads'][0]['signature'], 'The uploaded weekly chart is not JPEG data.' );
@@ -534,5 +538,9 @@ $delayed_scheduled = $report->build_message( 'scheduled' );
 $manual_on_sunday  = $report->build_message();
 jlwi_weekly_assert( false !== strpos( $delayed_scheduled, '2026-08-08 تا 2026-08-14' ), 'A delayed cron run should retain the configured Saturday-to-Friday period.' );
 jlwi_weekly_assert( false !== strpos( $manual_on_sunday, '2026-08-09 تا 2026-08-15' ), 'A manual report should use the last seven complete calendar days.' );
+
+$GLOBALS['jlwi_weekly_options'][ JLWI_OPTION ]['report_recipients'] = '';
+JLWI_Weekly_Report::reschedule();
+jlwi_weekly_assert( false === $GLOBALS['jlwi_weekly_cron'], 'Weekly report cron remained scheduled without report recipients.' );
 
 fwrite( STDOUT, "Weekly report smoke test passed.\n" );

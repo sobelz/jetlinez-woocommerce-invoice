@@ -112,7 +112,7 @@ final class JLWI_Daily_Report {
 	}
 
 	/**
-	 * Send the current report to the configured fixed admin recipients.
+	 * Send the current report to the dedicated report recipients.
 	 *
 	 * This method is also used by the manual test action. It intentionally does
 	 * not require the schedule toggle, so an administrator can test before
@@ -140,7 +140,7 @@ final class JLWI_Daily_Report {
 
 			$recipients = self::admin_recipients();
 			if ( empty( $recipients ) ) {
-				$error = new WP_Error( 'jlwi_report_no_recipients', __( 'برای گزارش روزانه هیچ شماره ادمین معتبری تنظیم نشده است.', JLWI_TEXT_DOMAIN ) );
+				$error = new WP_Error( 'jlwi_report_no_recipients', __( 'برای گزارش روزانه هیچ شماره معتبری در فهرست گیرندگان گزارش تنظیم نشده است.', JLWI_TEXT_DOMAIN ) );
 				$this->store_result( 'failed', 0, 0, $error->get_error_message(), $period );
 				return $error;
 			}
@@ -259,18 +259,18 @@ final class JLWI_Daily_Report {
 	}
 
 	/**
-	 * Return normalized fixed admin recipients.
+	 * Return normalized dedicated report recipients.
 	 *
 	 * @return string[]
 	 */
 	public static function admin_recipients() {
-		$raw = preg_split( '/[\r\n,;،؛]+/u', (string) JLWI_Settings::get( 'fixed_recipients', '' ) );
+		$raw = preg_split( '/[\r\n,;،؛]+/u', (string) JLWI_Settings::get( 'report_recipients', '' ) );
 		$raw = is_array( $raw ) ? $raw : array();
 
 		/**
 		 * Filter raw daily-report recipients before phone normalization.
 		 *
-		 * @param array $raw Raw fixed-recipient values.
+		 * @param array $raw Raw report-recipient values.
 		 */
 		$raw          = apply_filters( 'jlwi_daily_report_recipients', $raw );
 		$raw          = is_array( $raw ) ? $raw : array();
@@ -326,7 +326,7 @@ final class JLWI_Daily_Report {
 	 */
 	private static function schedule_enabled() {
 		$sections = JLWI_Settings::sanitize_report_sections( JLWI_Settings::get( 'daily_report_sections', array() ) );
-		return JLWI_Settings::enabled( 'daily_report_enabled' ) && ! empty( $sections );
+		return JLWI_Settings::enabled( 'daily_report_enabled' ) && ! empty( $sections ) && ! empty( self::admin_recipients() );
 	}
 
 	/**

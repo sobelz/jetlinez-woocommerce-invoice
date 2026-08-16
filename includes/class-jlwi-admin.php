@@ -209,7 +209,7 @@ final class JLWI_Admin {
 										<tr>
 											<th><?php echo esc_html__( 'وضعیت سفارش', JLWI_TEXT_DOMAIN ); ?></th>
 											<th><?php echo esc_html__( 'مشتری', JLWI_TEXT_DOMAIN ); ?></th>
-											<th><?php echo esc_html__( 'ادمین‌ها (شماره‌های ثابت)', JLWI_TEXT_DOMAIN ); ?></th>
+											<th><?php echo esc_html__( 'گیرندگان ثابت فاکتور', JLWI_TEXT_DOMAIN ); ?></th>
 										</tr>
 										</thead>
 										<tbody>
@@ -234,17 +234,17 @@ final class JLWI_Admin {
 							</td>
 						</tr>
 						<tr>
-							<th scope="row"><label for="jlwi-fixed-recipients"><?php echo esc_html__( 'شماره‌های ادمین‌ها', JLWI_TEXT_DOMAIN ); ?></label></th>
+							<th scope="row"><label for="jlwi-fixed-recipients"><?php echo esc_html__( 'شماره‌های گیرندگان فاکتور', JLWI_TEXT_DOMAIN ); ?></label></th>
 							<td>
 								<textarea id="jlwi-fixed-recipients" class="large-text code ltr" rows="6" name="jlwi[fixed_recipients]" placeholder="989121234567&#10;989351234567"><?php echo esc_textarea( $settings['fixed_recipients'] ); ?></textarea>
-								<p class="description"><?php echo esc_html__( 'شماره‌های ثابت، گیرنده «ادمین» محسوب می‌شوند. هر شماره در یک خط؛ جداکننده ویرگول یا نقطه‌ویرگول نیز پذیرفته می‌شود.', JLWI_TEXT_DOMAIN ); ?></p>
+								<p class="description"><?php echo esc_html__( 'مسیر گیرندگان ثابت پیام وضعیت و فاکتور از این فهرست استفاده می‌کند؛ این شماره‌ها از گیرندگان گزارش مستقل‌اند. هر شماره در یک خط؛ ویرگول و نقطه‌ویرگول نیز پذیرفته می‌شود.', JLWI_TEXT_DOMAIN ); ?></p>
 							</td>
 						</tr>
 						<tr>
 							<th scope="row"><?php echo esc_html__( 'ارسال به مشتری', JLWI_TEXT_DOMAIN ); ?></th>
 							<td>
 								<?php $this->checkbox( 'include_billing_phone', $settings['include_billing_phone'], __( 'ارسال‌های ستون مشتری به شماره صورتحساب سفارش انجام شود.', JLWI_TEXT_DOMAIN ) ); ?>
-								<p class="description"><?php echo esc_html__( 'با خاموش‌کردن این گزینه فقط مسیر مشتری متوقف می‌شود و ارسال به شماره‌های ادمین ادامه دارد.', JLWI_TEXT_DOMAIN ); ?></p>
+								<p class="description"><?php echo esc_html__( 'با خاموش‌کردن این گزینه فقط مسیر مشتری متوقف می‌شود و ارسال به گیرندگان ثابت فاکتور ادامه دارد.', JLWI_TEXT_DOMAIN ); ?></p>
 							</td>
 						</tr>
 						<tr>
@@ -314,15 +314,31 @@ final class JLWI_Admin {
 
 				<?php if ( 'reports' === $active_tab ) : ?>
 				<div id="jlwi-panel-reports" class="jlwi-tab-panel" role="region" aria-labelledby="jlwi-tab-reports">
+				<section class="jlwi-card">
+					<h2><?php echo esc_html__( 'گیرندگان گزارش‌ها', JLWI_TEXT_DOMAIN ); ?></h2>
+					<p><?php echo esc_html__( 'گزارش‌های روزانه و هفتگی، چه زمان‌بندی‌شده و چه فوری، فقط به شماره‌های این فهرست ارسال می‌شوند.', JLWI_TEXT_DOMAIN ); ?></p>
+					<table class="form-table" role="presentation">
+						<tbody>
+						<tr>
+							<th scope="row"><label for="jlwi-report-recipients"><?php echo esc_html__( 'شماره‌های مدیران گزارش', JLWI_TEXT_DOMAIN ); ?></label></th>
+							<td>
+								<textarea id="jlwi-report-recipients" class="large-text code ltr" rows="6" name="jlwi[report_recipients]" placeholder="989121234567&#10;989351234567"><?php echo esc_textarea( $settings['report_recipients'] ); ?></textarea>
+								<p class="description"><?php echo esc_html__( 'این فهرست از گیرندگان فاکتور جداست. هر شماره در یک خط؛ ویرگول و نقطه‌ویرگول نیز پذیرفته می‌شود.', JLWI_TEXT_DOMAIN ); ?></p>
+							</td>
+						</tr>
+						</tbody>
+					</table>
+				</section>
+
 				<section id="jlwi-daily-report" class="jlwi-card">
 					<h2><?php echo esc_html__( 'گزارش روزانه واتساپ', JLWI_TEXT_DOMAIN ); ?></h2>
-					<p><?php echo esc_html__( 'گزارش از همان API Key و Device ID واتساپ استفاده می‌کند و برای همه شماره‌های ادمینِ بخش «وضعیت‌ها و گیرنده‌ها» فرستاده می‌شود.', JLWI_TEXT_DOMAIN ); ?></p>
+					<p><?php echo esc_html__( 'گزارش از همان API Key و Device ID واتساپ استفاده می‌کند و فقط برای گیرندگان گزارش تنظیم‌شده در بالا فرستاده می‌شود.', JLWI_TEXT_DOMAIN ); ?></p>
 					<table class="form-table" role="presentation">
 						<tbody>
 						<tr>
 							<th scope="row"><?php echo esc_html__( 'فعال‌سازی گزارش', JLWI_TEXT_DOMAIN ); ?></th>
 							<td>
-								<?php $this->checkbox( 'daily_report_enabled', $settings['daily_report_enabled'], __( 'هر روز گزارش فروش از طریق واتساپ برای ادمین‌ها ارسال شود.', JLWI_TEXT_DOMAIN ) ); ?>
+								<?php $this->checkbox( 'daily_report_enabled', $settings['daily_report_enabled'], __( 'هر روز گزارش فروش از طریق واتساپ برای گیرندگان گزارش ارسال شود.', JLWI_TEXT_DOMAIN ) ); ?>
 								<p class="description"><?php echo esc_html( $this->report_schedule_text( $report_enabled, $next_report ) ); ?></p>
 							</td>
 						</tr>
@@ -354,13 +370,13 @@ final class JLWI_Admin {
 
 				<section class="jlwi-card">
 					<h2><?php echo esc_html__( 'گزارش هفتگی واتساپ', JLWI_TEXT_DOMAIN ); ?></h2>
-					<p><?php echo esc_html__( 'گزارش هفتگی، ۷ روز تقویمی کامل گذشته را با ۷ روز قبل از آن مقایسه می‌کند و برای شماره‌های ادمین فرستاده می‌شود. پیش‌فرض زمان‌بندی شنبه است؛ یعنی گزارش شنبه تا جمعهٔ قبل ارسال می‌شود.', JLWI_TEXT_DOMAIN ); ?></p>
+					<p><?php echo esc_html__( 'گزارش هفتگی، ۷ روز تقویمی کامل گذشته را با ۷ روز قبل از آن مقایسه می‌کند و فقط برای گیرندگان گزارش فرستاده می‌شود. پیش‌فرض زمان‌بندی شنبه است؛ یعنی گزارش شنبه تا جمعهٔ قبل ارسال می‌شود.', JLWI_TEXT_DOMAIN ); ?></p>
 					<table class="form-table" role="presentation">
 						<tbody>
 						<tr>
 							<th scope="row"><?php echo esc_html__( 'فعال‌سازی گزارش', JLWI_TEXT_DOMAIN ); ?></th>
 							<td>
-								<?php $this->checkbox( 'weekly_report_enabled', $settings['weekly_report_enabled'], __( 'هر هفته گزارش فروش از طریق واتساپ برای ادمین‌ها ارسال شود.', JLWI_TEXT_DOMAIN ) ); ?>
+								<?php $this->checkbox( 'weekly_report_enabled', $settings['weekly_report_enabled'], __( 'هر هفته گزارش فروش از طریق واتساپ برای گیرندگان گزارش ارسال شود.', JLWI_TEXT_DOMAIN ) ); ?>
 								<p class="description"><?php echo esc_html( $this->weekly_report_schedule_text( $weekly_report_enabled, $next_weekly_report ) ); ?></p>
 							</td>
 						</tr>
@@ -447,7 +463,7 @@ final class JLWI_Admin {
 			<?php if ( 'reports' === $active_tab ) : ?>
 			<section class="jlwi-card jlwi-test-card">
 				<h2><?php echo esc_html__( 'ارسال فوری گزارش ۲۴ ساعت گذشته', JLWI_TEXT_DOMAIN ); ?></h2>
-				<p><?php echo esc_html__( 'این دکمه یک گزارش واقعی از ۲۴ ساعت گذشته می‌سازد، فروش را با ۲۴ ساعت قبل از آن مقایسه می‌کند و همان لحظه برای شماره‌های ادمین می‌فرستد. برای تست اتصال و استفاده عملی قابل استفاده است و ممکن است اعتبار حساب جتلاینز را مصرف کند.', JLWI_TEXT_DOMAIN ); ?></p>
+				<p><?php echo esc_html__( 'این دکمه یک گزارش واقعی از ۲۴ ساعت گذشته می‌سازد، فروش را با ۲۴ ساعت قبل از آن مقایسه می‌کند و همان لحظه برای گیرندگان گزارش می‌فرستد. این ارسال ممکن است اعتبار حساب جتلاینز را مصرف کند.', JLWI_TEXT_DOMAIN ); ?></p>
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 					<input type="hidden" name="action" value="jlwi_send_daily_report_now">
 					<?php wp_nonce_field( 'jlwi_send_daily_report_now' ); ?>
@@ -458,7 +474,7 @@ final class JLWI_Admin {
 
 			<section class="jlwi-card jlwi-test-card">
 				<h2><?php echo esc_html__( 'ارسال فوری گزارش هفتگی', JLWI_TEXT_DOMAIN ); ?></h2>
-				<p><?php echo esc_html__( 'این دکمه گزارش ۷ روز تقویمی کامل گذشته را همان لحظه برای شماره‌های ادمین می‌فرستد و ممکن است اعتبار حساب جتلاینز را مصرف کند.', JLWI_TEXT_DOMAIN ); ?></p>
+				<p><?php echo esc_html__( 'این دکمه گزارش ۷ روز تقویمی کامل گذشته را همان لحظه برای گیرندگان گزارش می‌فرستد و ممکن است اعتبار حساب جتلاینز را مصرف کند.', JLWI_TEXT_DOMAIN ); ?></p>
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 					<input type="hidden" name="action" value="jlwi_send_weekly_report_now">
 					<?php wp_nonce_field( 'jlwi_send_weekly_report_now' ); ?>
@@ -581,6 +597,7 @@ X-API-KEY: ********
 			}
 
 			$new['daily_report_time']       = JLWI_Settings::sanitize_report_time( isset( $raw['daily_report_time'] ) ? $raw['daily_report_time'] : $existing['daily_report_time'] );
+			$new['report_recipients']       = isset( $raw['report_recipients'] ) ? sanitize_textarea_field( (string) $raw['report_recipients'] ) : '';
 			$new['daily_report_sections']   = JLWI_Settings::sanitize_report_sections( isset( $raw['daily_report_sections'] ) ? $raw['daily_report_sections'] : array() );
 			$new['weekly_report_day']       = JLWI_Settings::sanitize_weekly_report_day( isset( $raw['weekly_report_day'] ) ? $raw['weekly_report_day'] : $existing['weekly_report_day'] );
 			$new['weekly_report_time']      = JLWI_Settings::sanitize_report_time( isset( $raw['weekly_report_time'] ) ? $raw['weekly_report_time'] : $existing['weekly_report_time'] );
@@ -638,7 +655,7 @@ X-API-KEY: ********
 	}
 
 	/**
-	 * Build and immediately send a rolling 24-hour report to admin recipients.
+	 * Build and immediately send a rolling 24-hour report to report recipients.
 	 *
 	 * @return void
 	 */
@@ -733,6 +750,9 @@ X-API-KEY: ********
 		if ( empty( $sections ) ) {
 			return __( 'فعال است، اما برای زمان‌بندی باید حداقل یک بخش گزارش انتخاب شود.', JLWI_TEXT_DOMAIN );
 		}
+		if ( empty( JLWI_Daily_Report::admin_recipients() ) ) {
+			return __( 'فعال است، اما حداقل یک شماره معتبر برای گیرندگان گزارش لازم است.', JLWI_TEXT_DOMAIN );
+		}
 
 		if ( false === $timestamp ) {
 			return __( 'فعال است؛ رویداد WP-Cron پس از ذخیره تنظیمات ایجاد می‌شود.', JLWI_TEXT_DOMAIN );
@@ -759,6 +779,9 @@ X-API-KEY: ********
 		$sections = JLWI_Settings::sanitize_weekly_report_sections( JLWI_Settings::get( 'weekly_report_sections', array() ) );
 		if ( empty( $sections ) ) {
 			return __( 'فعال است، اما برای زمان‌بندی باید حداقل یک بخش گزارش انتخاب شود.', JLWI_TEXT_DOMAIN );
+		}
+		if ( empty( JLWI_Weekly_Report::admin_recipients() ) ) {
+			return __( 'فعال است، اما حداقل یک شماره معتبر برای گیرندگان گزارش لازم است.', JLWI_TEXT_DOMAIN );
 		}
 
 		if ( false === $timestamp ) {

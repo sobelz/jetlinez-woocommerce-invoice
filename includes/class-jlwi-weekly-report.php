@@ -139,7 +139,7 @@ final class JLWI_Weekly_Report {
 
 			$recipients = self::admin_recipients();
 			if ( empty( $recipients ) ) {
-				$error = new WP_Error( 'jlwi_weekly_report_no_recipients', __( 'برای گزارش هفتگی هیچ شماره ادمین معتبری تنظیم نشده است.', JLWI_TEXT_DOMAIN ) );
+				$error = new WP_Error( 'jlwi_weekly_report_no_recipients', __( 'برای گزارش هفتگی هیچ شماره معتبری در فهرست گیرندگان گزارش تنظیم نشده است.', JLWI_TEXT_DOMAIN ) );
 				$this->store_result( 'failed', 0, 0, $error->get_error_message() );
 				return $error;
 			}
@@ -316,12 +316,12 @@ final class JLWI_Weekly_Report {
 	}
 
 	/**
-	 * Return normalized fixed admin recipients for weekly reports.
+	 * Return normalized dedicated report recipients for weekly reports.
 	 *
 	 * @return string[]
 	 */
 	public static function admin_recipients() {
-		$raw = preg_split( '/[\r\n,;،؛]+/u', (string) JLWI_Settings::get( 'fixed_recipients', '' ) );
+		$raw = preg_split( '/[\r\n,;،؛]+/u', (string) JLWI_Settings::get( 'report_recipients', '' ) );
 		$raw = is_array( $raw ) ? $raw : array();
 		$raw = apply_filters( 'jlwi_weekly_report_recipients', $raw );
 		$raw = is_array( $raw ) ? $raw : array();
@@ -380,7 +380,7 @@ final class JLWI_Weekly_Report {
 	 */
 	private static function schedule_enabled() {
 		$sections = JLWI_Settings::sanitize_weekly_report_sections( JLWI_Settings::get( 'weekly_report_sections', array() ) );
-		return JLWI_Settings::enabled( 'weekly_report_enabled' ) && ! empty( $sections );
+		return JLWI_Settings::enabled( 'weekly_report_enabled' ) && ! empty( $sections ) && ! empty( self::admin_recipients() );
 	}
 
 	/**
