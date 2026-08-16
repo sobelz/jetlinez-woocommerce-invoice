@@ -99,6 +99,8 @@ final class JLWI_Admin {
 			4 => __( 'پنجشنبه', JLWI_TEXT_DOMAIN ),
 			5 => __( 'جمعه', JLWI_TEXT_DOMAIN ),
 		);
+		$active_tab            = $this->current_tab();
+		$tabs                  = $this->settings_tabs();
 		?>
 		<div class="wrap jlwi-wrap" dir="rtl">
 			<h1><?php echo esc_html__( 'Jetlinez Invoice برای WooCommerce', JLWI_TEXT_DOMAIN ); ?></h1>
@@ -106,21 +108,35 @@ final class JLWI_Admin {
 				<?php echo esc_html__( 'ارسال خودکار پیام وضعیت و فاکتور سفارش‌های ووکامرس از طریق واتساپ جتلاینز.', JLWI_TEXT_DOMAIN ); ?>
 			</p>
 
-			<div class="jlwi-status-grid">
-				<?php $this->status_card( __( 'اتصال API', JLWI_TEXT_DOMAIN ), JLWI_Settings::is_api_configured(), JLWI_Settings::is_api_configured() ? __( 'تنظیمات کامل است', JLWI_TEXT_DOMAIN ) : __( 'API Key یا Device ID ناقص است', JLWI_TEXT_DOMAIN ) ); ?>
-				<?php $this->status_card( __( 'WooCommerce', JLWI_TEXT_DOMAIN ), class_exists( 'WooCommerce' ), class_exists( 'WooCommerce' ) ? __( 'فعال', JLWI_TEXT_DOMAIN ) : __( 'غیرفعال', JLWI_TEXT_DOMAIN ) ); ?>
-				<?php $this->status_card( __( 'Ultimate Invoice', JLWI_TEXT_DOMAIN ), $this->invoice_available(), $this->invoice_available() ? __( 'تولید PDF آماده است', JLWI_TEXT_DOMAIN ) : __( 'حالت متنی استفاده می‌شود', JLWI_TEXT_DOMAIN ) ); ?>
-				<?php $this->status_card( __( 'صف ارسال', JLWI_TEXT_DOMAIN ), function_exists( 'as_enqueue_async_action' ), function_exists( 'as_enqueue_async_action' ) ? __( 'Action Scheduler فعال است', JLWI_TEXT_DOMAIN ) : __( 'از WP-Cron/ارسال مستقیم استفاده می‌شود', JLWI_TEXT_DOMAIN ) ); ?>
-				<?php $this->status_card( __( 'گزارش روزانه', JLWI_TEXT_DOMAIN ), $report_enabled && false !== $next_report, $this->report_schedule_text( $report_enabled, $next_report ) ); ?>
-				<?php $this->status_card( __( 'گزارش هفتگی', JLWI_TEXT_DOMAIN ), $weekly_report_enabled && false !== $next_weekly_report, $this->weekly_report_schedule_text( $weekly_report_enabled, $next_weekly_report ) ); ?>
-			</div>
+			<nav class="nav-tab-wrapper woo-nav-tab-wrapper jlwi-tabs" aria-label="<?php echo esc_attr__( 'بخش‌های تنظیمات Jetlinez', JLWI_TEXT_DOMAIN ); ?>">
+				<?php foreach ( $tabs as $tab_key => $tab_label ) : ?>
+					<a
+						id="jlwi-tab-<?php echo esc_attr( $tab_key ); ?>"
+						href="<?php echo esc_url( $this->settings_url( $tab_key ) ); ?>"
+						class="nav-tab <?php echo $active_tab === $tab_key ? 'nav-tab-active' : ''; ?>"
+						<?php echo $active_tab === $tab_key ? 'aria-current="page"' : ''; ?>
+					><?php echo esc_html( $tab_label ); ?></a>
+				<?php endforeach; ?>
+			</nav>
 
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<input type="hidden" name="action" value="jlwi_save_settings">
+				<input type="hidden" name="jlwi_tab" value="<?php echo esc_attr( $active_tab ); ?>">
 				<?php wp_nonce_field( 'jlwi_save_settings' ); ?>
 
+				<?php if ( 'connection' === $active_tab ) : ?>
+				<div id="jlwi-panel-connection" class="jlwi-tab-panel" role="region" aria-labelledby="jlwi-tab-connection">
+					<div class="jlwi-status-grid">
+						<?php $this->status_card( __( 'اتصال API', JLWI_TEXT_DOMAIN ), JLWI_Settings::is_api_configured(), JLWI_Settings::is_api_configured() ? __( 'تنظیمات کامل است', JLWI_TEXT_DOMAIN ) : __( 'API Key یا Device ID ناقص است', JLWI_TEXT_DOMAIN ) ); ?>
+						<?php $this->status_card( __( 'WooCommerce', JLWI_TEXT_DOMAIN ), class_exists( 'WooCommerce' ), class_exists( 'WooCommerce' ) ? __( 'فعال', JLWI_TEXT_DOMAIN ) : __( 'غیرفعال', JLWI_TEXT_DOMAIN ) ); ?>
+						<?php $this->status_card( __( 'Ultimate Invoice', JLWI_TEXT_DOMAIN ), $this->invoice_available(), $this->invoice_available() ? __( 'تولید PDF آماده است', JLWI_TEXT_DOMAIN ) : __( 'حالت متنی استفاده می‌شود', JLWI_TEXT_DOMAIN ) ); ?>
+						<?php $this->status_card( __( 'صف ارسال', JLWI_TEXT_DOMAIN ), function_exists( 'as_enqueue_async_action' ), function_exists( 'as_enqueue_async_action' ) ? __( 'Action Scheduler فعال است', JLWI_TEXT_DOMAIN ) : __( 'از WP-Cron/ارسال مستقیم استفاده می‌شود', JLWI_TEXT_DOMAIN ) ); ?>
+						<?php $this->status_card( __( 'گزارش روزانه', JLWI_TEXT_DOMAIN ), $report_enabled && false !== $next_report, $this->report_schedule_text( $report_enabled, $next_report ) ); ?>
+						<?php $this->status_card( __( 'گزارش هفتگی', JLWI_TEXT_DOMAIN ), $weekly_report_enabled && false !== $next_weekly_report, $this->weekly_report_schedule_text( $weekly_report_enabled, $next_weekly_report ) ); ?>
+					</div>
+
 				<section class="jlwi-card">
-					<h2><?php echo esc_html__( '۱. اتصال به Jetlinez', JLWI_TEXT_DOMAIN ); ?></h2>
+					<h2><?php echo esc_html__( 'اتصال به Jetlinez', JLWI_TEXT_DOMAIN ); ?></h2>
 					<table class="form-table" role="presentation">
 						<tbody>
 						<tr>
@@ -158,9 +174,14 @@ final class JLWI_Admin {
 						</tbody>
 					</table>
 				</section>
+					<?php submit_button( __( 'ذخیره تنظیمات اتصال', JLWI_TEXT_DOMAIN ) ); ?>
+				</div>
+				<?php endif; ?>
 
+				<?php if ( 'invoices' === $active_tab ) : ?>
+				<div id="jlwi-panel-invoices" class="jlwi-tab-panel" role="region" aria-labelledby="jlwi-tab-invoices">
 				<section class="jlwi-card">
-					<h2><?php echo esc_html__( '۲. وضعیت‌ها و گیرنده‌ها', JLWI_TEXT_DOMAIN ); ?></h2>
+					<h2><?php echo esc_html__( 'وضعیت‌ها و گیرنده‌ها', JLWI_TEXT_DOMAIN ); ?></h2>
 					<table class="form-table" role="presentation">
 						<tbody>
 						<tr>
@@ -242,7 +263,7 @@ final class JLWI_Admin {
 				</section>
 
 				<section class="jlwi-card">
-					<h2><?php echo esc_html__( '۳. فایل فاکتور و رفتار جایگزین', JLWI_TEXT_DOMAIN ); ?></h2>
+					<h2><?php echo esc_html__( 'فایل فاکتور و رفتار جایگزین', JLWI_TEXT_DOMAIN ); ?></h2>
 					<table class="form-table" role="presentation">
 						<tbody>
 						<tr>
@@ -269,7 +290,7 @@ final class JLWI_Admin {
 				</section>
 
 				<section class="jlwi-card">
-					<h2><?php echo esc_html__( '۴. متن پیام‌ها', JLWI_TEXT_DOMAIN ); ?></h2>
+					<h2><?php echo esc_html__( 'متن پیام‌ها', JLWI_TEXT_DOMAIN ); ?></h2>
 					<p><?php echo esc_html__( 'قالب وضعیت برای حالت «فقط متن» و بخش متنی حالت «متن و فایل» استفاده می‌شود. اگر فایل در حالت «متن و فایل» در دسترس نباشد، قالب جایگزین متنی ارسال می‌شود؛ حالت «فقط فایل» هرگز متن جایگزین نمی‌فرستد.', JLWI_TEXT_DOMAIN ); ?></p>
 					<table class="form-table" role="presentation">
 						<tbody>
@@ -287,9 +308,14 @@ final class JLWI_Admin {
 						<code>{shipping_address}</code> <code>{site_name}</code> <code>{site_url}</code> <code>{invoice_note}</code>
 					</div>
 				</section>
+					<?php submit_button( __( 'ذخیره تنظیمات فاکتورها', JLWI_TEXT_DOMAIN ) ); ?>
+				</div>
+				<?php endif; ?>
 
+				<?php if ( 'reports' === $active_tab ) : ?>
+				<div id="jlwi-panel-reports" class="jlwi-tab-panel" role="region" aria-labelledby="jlwi-tab-reports">
 				<section id="jlwi-daily-report" class="jlwi-card">
-					<h2><?php echo esc_html__( '۵. گزارش روزانه واتساپ', JLWI_TEXT_DOMAIN ); ?></h2>
+					<h2><?php echo esc_html__( 'گزارش روزانه واتساپ', JLWI_TEXT_DOMAIN ); ?></h2>
 					<p><?php echo esc_html__( 'گزارش از همان API Key و Device ID واتساپ استفاده می‌کند و برای همه شماره‌های ادمینِ بخش «وضعیت‌ها و گیرنده‌ها» فرستاده می‌شود.', JLWI_TEXT_DOMAIN ); ?></p>
 					<table class="form-table" role="presentation">
 						<tbody>
@@ -327,7 +353,7 @@ final class JLWI_Admin {
 				</section>
 
 				<section class="jlwi-card">
-					<h2><?php echo esc_html__( '۶. گزارش هفتگی واتساپ', JLWI_TEXT_DOMAIN ); ?></h2>
+					<h2><?php echo esc_html__( 'گزارش هفتگی واتساپ', JLWI_TEXT_DOMAIN ); ?></h2>
 					<p><?php echo esc_html__( 'گزارش هفتگی، ۷ روز تقویمی کامل گذشته را با ۷ روز قبل از آن مقایسه می‌کند و برای شماره‌های ادمین فرستاده می‌شود. پیش‌فرض زمان‌بندی شنبه است؛ یعنی گزارش شنبه تا جمعهٔ قبل ارسال می‌شود.', JLWI_TEXT_DOMAIN ); ?></p>
 					<table class="form-table" role="presentation">
 						<tbody>
@@ -373,9 +399,14 @@ final class JLWI_Admin {
 						</tbody>
 					</table>
 				</section>
+					<?php submit_button( __( 'ذخیره تنظیمات گزارش‌ها', JLWI_TEXT_DOMAIN ) ); ?>
+				</div>
+				<?php endif; ?>
 
+				<?php if ( 'advanced' === $active_tab ) : ?>
+				<div id="jlwi-panel-advanced" class="jlwi-tab-panel" role="region" aria-labelledby="jlwi-tab-advanced">
 				<section class="jlwi-card">
-					<h2><?php echo esc_html__( '۷. شبکه، تلاش مجدد و لاگ', JLWI_TEXT_DOMAIN ); ?></h2>
+					<h2><?php echo esc_html__( 'شبکه، تلاش مجدد و لاگ', JLWI_TEXT_DOMAIN ); ?></h2>
 					<table class="form-table" role="presentation">
 						<tbody>
 						<tr>
@@ -408,10 +439,12 @@ final class JLWI_Admin {
 						</tbody>
 					</table>
 				</section>
-
-				<?php submit_button( __( 'ذخیره تنظیمات', JLWI_TEXT_DOMAIN ) ); ?>
+					<?php submit_button( __( 'ذخیره تنظیمات پیشرفته', JLWI_TEXT_DOMAIN ) ); ?>
+				</div>
+				<?php endif; ?>
 			</form>
 
+			<?php if ( 'reports' === $active_tab ) : ?>
 			<section class="jlwi-card jlwi-test-card">
 				<h2><?php echo esc_html__( 'ارسال فوری گزارش ۲۴ ساعت گذشته', JLWI_TEXT_DOMAIN ); ?></h2>
 				<p><?php echo esc_html__( 'این دکمه یک گزارش واقعی از ۲۴ ساعت گذشته می‌سازد، فروش را با ۲۴ ساعت قبل از آن مقایسه می‌کند و همان لحظه برای شماره‌های ادمین می‌فرستد. برای تست اتصال و استفاده عملی قابل استفاده است و ممکن است اعتبار حساب جتلاینز را مصرف کند.', JLWI_TEXT_DOMAIN ); ?></p>
@@ -433,7 +466,9 @@ final class JLWI_Admin {
 				</form>
 				<?php $this->render_last_weekly_report_result(); ?>
 			</section>
+			<?php endif; ?>
 
+			<?php if ( 'connection' === $active_tab ) : ?>
 			<section class="jlwi-card jlwi-test-card">
 				<h2><?php echo esc_html__( 'ارسال پیام آزمایشی', JLWI_TEXT_DOMAIN ); ?></h2>
 				<p><?php echo esc_html__( 'این دکمه یک پیام واقعی از دستگاه انتخاب‌شده ارسال می‌کند و ممکن است اعتبار حساب جتلاینز را مصرف کند.', JLWI_TEXT_DOMAIN ); ?></p>
@@ -464,6 +499,7 @@ Content-Type: application/json
 X-API-KEY: ********
 {"phonenumber":"98912...","text":"...","mediaId":"uuid-optional"}</pre>
 			</section>
+			<?php endif; ?>
 		</div>
 		<?php
 	}
@@ -476,92 +512,95 @@ X-API-KEY: ********
 	public function save_settings() {
 		$this->authorize( 'jlwi_save_settings' );
 
-		$existing = JLWI_Settings::raw();
-		$raw      = isset( $_POST['jlwi'] ) && is_array( $_POST['jlwi'] ) ? wp_unslash( $_POST['jlwi'] ) : array(); // phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$defaults = JLWI_Settings::defaults();
-		$new      = $existing;
+		$active_tab = isset( $_POST['jlwi_tab'] ) ? $this->normalize_tab( wp_unslash( $_POST['jlwi_tab'] ) ) : 'connection'; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$existing   = JLWI_Settings::raw();
+		$raw        = isset( $_POST['jlwi'] ) && is_array( $_POST['jlwi'] ) ? wp_unslash( $_POST['jlwi'] ) : array(); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$new        = $existing;
 
-		$boolean_keys = array(
-			'enabled',
-			'include_billing_phone',
-			'prevent_duplicates',
-			'without_delay',
-			'add_order_notes',
-			'debug_logging',
-			'delete_local_pdf',
-			'delete_remote_media',
-			'delete_data_on_uninstall',
-			'daily_report_enabled',
-			'weekly_report_enabled',
-		);
-
-		foreach ( $boolean_keys as $key ) {
-			$new[ $key ] = isset( $raw[ $key ] ) ? 'yes' : 'no';
-		}
-
-		$new['target_statuses']          = JLWI_Settings::sanitize_statuses( isset( $raw['target_statuses'] ) ? $raw['target_statuses'] : array() );
-		$new['delivery_modes']           = JLWI_Settings::sanitize_delivery_modes( isset( $raw['delivery_modes'] ) ? $raw['delivery_modes'] : array() );
-		$new['daily_report_time']        = JLWI_Settings::sanitize_report_time( isset( $raw['daily_report_time'] ) ? $raw['daily_report_time'] : $existing['daily_report_time'] );
-		$new['daily_report_sections']    = JLWI_Settings::sanitize_report_sections( isset( $raw['daily_report_sections'] ) ? $raw['daily_report_sections'] : array() );
-		$new['weekly_report_day']        = JLWI_Settings::sanitize_weekly_report_day( isset( $raw['weekly_report_day'] ) ? $raw['weekly_report_day'] : $existing['weekly_report_day'] );
-		$new['weekly_report_time']       = JLWI_Settings::sanitize_report_time( isset( $raw['weekly_report_time'] ) ? $raw['weekly_report_time'] : $existing['weekly_report_time'] );
-		$new['weekly_report_sections'] = JLWI_Settings::sanitize_weekly_report_sections( isset( $raw['weekly_report_sections'] ) ? $raw['weekly_report_sections'] : array() );
-		// Keep legacy flags in sync so downgrading does not unexpectedly enable a status.
-		$new['enable_processing'] = in_array( 'processing', $new['target_statuses'], true ) ? 'yes' : 'no';
-		$new['enable_completed']  = in_array( 'completed', $new['target_statuses'], true ) ? 'yes' : 'no';
-
-		if ( ! ( defined( 'JLWI_API_BASE_URL' ) && '' !== trim( (string) JLWI_API_BASE_URL ) ) ) {
-			$base_url = isset( $raw['api_base_url'] ) ? untrailingslashit( esc_url_raw( trim( (string) $raw['api_base_url'] ) ) ) : '';
-			if ( ! $this->valid_api_url( $base_url ) ) {
-				$base_url = $existing['api_base_url'];
+		if ( 'connection' === $active_tab ) {
+			foreach ( array( 'enabled', 'without_delay' ) as $key ) {
+				$new[ $key ] = isset( $raw[ $key ] ) ? 'yes' : 'no';
 			}
-			$new['api_base_url'] = $base_url;
-		}
 
-		if ( ! ( defined( 'JLWI_API_KEY' ) && '' !== trim( (string) JLWI_API_KEY ) ) ) {
-			if ( isset( $raw['clear_api_key'] ) ) {
-				$new['api_key'] = '';
-			} else {
-				$api_key = isset( $raw['api_key'] ) ? trim( (string) $raw['api_key'] ) : '';
-				$api_key = preg_replace( '/[\r\n]+/', '', $api_key );
-				if ( '' !== $api_key ) {
-					$new['api_key'] = $api_key;
+			if ( ! ( defined( 'JLWI_API_BASE_URL' ) && '' !== trim( (string) JLWI_API_BASE_URL ) ) ) {
+				$base_url = isset( $raw['api_base_url'] ) ? untrailingslashit( esc_url_raw( trim( (string) $raw['api_base_url'] ) ) ) : '';
+				if ( ! $this->valid_api_url( $base_url ) ) {
+					$base_url = $existing['api_base_url'];
+				}
+				$new['api_base_url'] = $base_url;
+			}
+
+			if ( ! ( defined( 'JLWI_API_KEY' ) && '' !== trim( (string) JLWI_API_KEY ) ) ) {
+				if ( isset( $raw['clear_api_key'] ) ) {
+					$new['api_key'] = '';
+				} else {
+					$api_key = isset( $raw['api_key'] ) ? trim( (string) $raw['api_key'] ) : '';
+					$api_key = preg_replace( '/[\r\n]+/', '', $api_key );
+					if ( '' !== $api_key ) {
+						$new['api_key'] = $api_key;
+					}
 				}
 			}
-		}
 
-		if ( ! ( defined( 'JLWI_DEVICE_ID' ) && '' !== trim( (string) JLWI_DEVICE_ID ) ) ) {
-			$new['device_id'] = isset( $raw['device_id'] ) ? sanitize_text_field( trim( (string) $raw['device_id'] ) ) : '';
-		}
+			if ( ! ( defined( 'JLWI_DEVICE_ID' ) && '' !== trim( (string) JLWI_DEVICE_ID ) ) ) {
+				$new['device_id'] = isset( $raw['device_id'] ) ? sanitize_text_field( trim( (string) $raw['device_id'] ) ) : '';
+			}
+		} elseif ( 'invoices' === $active_tab ) {
+			foreach ( array( 'include_billing_phone', 'prevent_duplicates', 'add_order_notes', 'delete_local_pdf', 'delete_remote_media' ) as $key ) {
+				$new[ $key ] = isset( $raw[ $key ] ) ? 'yes' : 'no';
+			}
 
-		$new['fixed_recipients'] = isset( $raw['fixed_recipients'] ) ? sanitize_textarea_field( (string) $raw['fixed_recipients'] ) : '';
-		$country_code           = isset( $raw['default_country_code'] ) ? JLWI_Settings::ascii_digits( $raw['default_country_code'] ) : '98';
-		$country_code           = preg_replace( '/\D+/', '', $country_code );
-		if ( 0 === strpos( $country_code, '00' ) ) {
-			$country_code = substr( $country_code, 2 );
-		}
-		$new['default_country_code'] = ltrim( (string) $country_code, '0' );
-		if ( '' === $new['default_country_code'] ) {
-			$new['default_country_code'] = '98';
-		}
+			$new['target_statuses'] = JLWI_Settings::sanitize_statuses( isset( $raw['target_statuses'] ) ? $raw['target_statuses'] : array() );
+			$new['delivery_modes']  = JLWI_Settings::sanitize_delivery_modes( isset( $raw['delivery_modes'] ) ? $raw['delivery_modes'] : array() );
+			// Keep legacy flags in sync so downgrading does not unexpectedly enable a status.
+			$new['enable_processing'] = in_array( 'processing', $new['target_statuses'], true ) ? 'yes' : 'no';
+			$new['enable_completed']  = in_array( 'completed', $new['target_statuses'], true ) ? 'yes' : 'no';
 
-		$new['timeout']          = $this->clamp_int( isset( $raw['timeout'] ) ? $raw['timeout'] : $existing['timeout'], 5, 120 );
-		$new['max_redirects']    = $this->clamp_int( isset( $raw['max_redirects'] ) ? $raw['max_redirects'] : $existing['max_redirects'], 0, 10 );
-		$new['max_file_mb']      = $this->clamp_int( isset( $raw['max_file_mb'] ) ? $raw['max_file_mb'] : $existing['max_file_mb'], 1, 100 );
-		$new['retry_count']      = $this->clamp_int( isset( $raw['retry_count'] ) ? $raw['retry_count'] : $existing['retry_count'], 0, 5 );
-		$new['retry_base_delay'] = $this->clamp_int( isset( $raw['retry_base_delay'] ) ? $raw['retry_base_delay'] : $existing['retry_base_delay'], 15, 3600 );
+			$new['fixed_recipients'] = isset( $raw['fixed_recipients'] ) ? sanitize_textarea_field( (string) $raw['fixed_recipients'] ) : '';
+			$country_code           = isset( $raw['default_country_code'] ) ? JLWI_Settings::ascii_digits( $raw['default_country_code'] ) : '98';
+			$country_code           = preg_replace( '/\D+/', '', $country_code );
+			if ( 0 === strpos( $country_code, '00' ) ) {
+				$country_code = substr( $country_code, 2 );
+			}
+			$new['default_country_code'] = ltrim( (string) $country_code, '0' );
+			if ( '' === $new['default_country_code'] ) {
+				$new['default_country_code'] = '98';
+			}
 
-		$template_keys = array( 'template_processing', 'template_completed', 'template_generic', 'template_fallback' );
-		foreach ( $template_keys as $key ) {
-			$value       = isset( $raw[ $key ] ) ? sanitize_textarea_field( (string) $raw[ $key ] ) : '';
-			$new[ $key ] = '' !== trim( $value ) ? $value : $defaults[ $key ];
+			$new['max_file_mb'] = $this->clamp_int( isset( $raw['max_file_mb'] ) ? $raw['max_file_mb'] : $existing['max_file_mb'], 1, 100 );
+
+			$defaults      = JLWI_Settings::defaults();
+			$template_keys = array( 'template_processing', 'template_completed', 'template_generic', 'template_fallback' );
+			foreach ( $template_keys as $key ) {
+				$value       = isset( $raw[ $key ] ) ? sanitize_textarea_field( (string) $raw[ $key ] ) : '';
+				$new[ $key ] = '' !== trim( $value ) ? $value : $defaults[ $key ];
+			}
+		} elseif ( 'reports' === $active_tab ) {
+			foreach ( array( 'daily_report_enabled', 'weekly_report_enabled' ) as $key ) {
+				$new[ $key ] = isset( $raw[ $key ] ) ? 'yes' : 'no';
+			}
+
+			$new['daily_report_time']       = JLWI_Settings::sanitize_report_time( isset( $raw['daily_report_time'] ) ? $raw['daily_report_time'] : $existing['daily_report_time'] );
+			$new['daily_report_sections']   = JLWI_Settings::sanitize_report_sections( isset( $raw['daily_report_sections'] ) ? $raw['daily_report_sections'] : array() );
+			$new['weekly_report_day']       = JLWI_Settings::sanitize_weekly_report_day( isset( $raw['weekly_report_day'] ) ? $raw['weekly_report_day'] : $existing['weekly_report_day'] );
+			$new['weekly_report_time']      = JLWI_Settings::sanitize_report_time( isset( $raw['weekly_report_time'] ) ? $raw['weekly_report_time'] : $existing['weekly_report_time'] );
+			$new['weekly_report_sections'] = JLWI_Settings::sanitize_weekly_report_sections( isset( $raw['weekly_report_sections'] ) ? $raw['weekly_report_sections'] : array() );
+		} elseif ( 'advanced' === $active_tab ) {
+			foreach ( array( 'debug_logging', 'delete_data_on_uninstall' ) as $key ) {
+				$new[ $key ] = isset( $raw[ $key ] ) ? 'yes' : 'no';
+			}
+
+			$new['timeout']          = $this->clamp_int( isset( $raw['timeout'] ) ? $raw['timeout'] : $existing['timeout'], 5, 120 );
+			$new['max_redirects']    = $this->clamp_int( isset( $raw['max_redirects'] ) ? $raw['max_redirects'] : $existing['max_redirects'], 0, 10 );
+			$new['retry_count']      = $this->clamp_int( isset( $raw['retry_count'] ) ? $raw['retry_count'] : $existing['retry_count'], 0, 5 );
+			$new['retry_base_delay'] = $this->clamp_int( isset( $raw['retry_base_delay'] ) ? $raw['retry_base_delay'] : $existing['retry_base_delay'], 15, 3600 );
 		}
 
 		update_option( JLWI_OPTION, $new, false );
 		JLWI_Daily_Report::reschedule();
 		JLWI_Weekly_Report::reschedule();
 		$this->set_notice( 'success', __( 'تنظیمات Jetlinez ذخیره شد.', JLWI_TEXT_DOMAIN ) );
-		wp_safe_redirect( $this->settings_url() );
+		wp_safe_redirect( $this->settings_url( $active_tab ) );
 		exit;
 	}
 
@@ -579,7 +618,7 @@ X-API-KEY: ********
 
 		if ( '' === $phone ) {
 			$this->set_notice( 'error', __( 'شماره آزمایشی معتبر نیست.', JLWI_TEXT_DOMAIN ) );
-			$this->redirect_settings();
+			$this->redirect_settings( 'connection' );
 		}
 
 		if ( '' === trim( $message ) ) {
@@ -595,7 +634,7 @@ X-API-KEY: ********
 			$this->set_notice( 'success', __( 'پیام آزمایشی با موفقیت به API جتلاینز تحویل شد.', JLWI_TEXT_DOMAIN ) );
 		}
 
-		$this->redirect_settings();
+		$this->redirect_settings( 'connection' );
 	}
 
 	/**
@@ -627,7 +666,7 @@ X-API-KEY: ********
 			);
 		}
 
-		$this->redirect_settings();
+		$this->redirect_settings( 'reports' );
 	}
 
 	/**
@@ -659,7 +698,7 @@ X-API-KEY: ********
 			);
 		}
 
-		$this->redirect_settings();
+		$this->redirect_settings( 'reports' );
 	}
 
 	/**
@@ -953,6 +992,43 @@ X-API-KEY: ********
 	}
 
 	/**
+	 * Return settings navigation tabs.
+	 *
+	 * @return array<string,string>
+	 */
+	private function settings_tabs() {
+		return array(
+			'connection' => __( 'اتصال', JLWI_TEXT_DOMAIN ),
+			'invoices'   => __( 'فاکتورها و ارسال', JLWI_TEXT_DOMAIN ),
+			'reports'    => __( 'گزارش‌ها', JLWI_TEXT_DOMAIN ),
+			'advanced'   => __( 'پیشرفته', JLWI_TEXT_DOMAIN ),
+		);
+	}
+
+	/**
+	 * Return the selected settings tab from the request.
+	 *
+	 * @return string
+	 */
+	private function current_tab() {
+		$tab = isset( $_GET['tab'] ) ? wp_unslash( $_GET['tab'] ) : 'connection'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		return $this->normalize_tab( $tab );
+	}
+
+	/**
+	 * Restrict a tab key to the known settings tabs.
+	 *
+	 * @param mixed $tab Requested tab.
+	 * @return string
+	 */
+	private function normalize_tab( $tab ) {
+		$tab  = is_scalar( $tab ) ? sanitize_key( (string) $tab ) : '';
+		$tabs = $this->settings_tabs();
+
+		return isset( $tabs[ $tab ] ) ? $tab : 'connection';
+	}
+
+	/**
 	 * Validate API base URL scheme.
 	 *
 	 * @param string $url URL.
@@ -994,23 +1070,31 @@ X-API-KEY: ********
 	}
 
 	/**
-	 * Redirect to settings and stop.
+	 * Redirect to a settings tab and stop.
 	 *
+	 * @param string $tab Destination tab.
 	 * @return void
 	 */
-	private function redirect_settings() {
-		wp_safe_redirect( $this->settings_url() );
+	private function redirect_settings( $tab = 'connection' ) {
+		wp_safe_redirect( $this->settings_url( $tab ) );
 		exit;
 	}
 
 	/**
 	 * Return the settings-page URL for the active dependency state.
 	 *
+	 * @param string $tab Optional tab key.
 	 * @return string
 	 */
-	private function settings_url() {
-		return class_exists( 'WooCommerce' )
+	private function settings_url( $tab = '' ) {
+		$url = class_exists( 'WooCommerce' )
 			? admin_url( 'admin.php?page=jlwi-settings' )
 			: admin_url( 'options-general.php?page=jlwi-settings' );
+
+		if ( '' !== (string) $tab ) {
+			$url = add_query_arg( 'tab', $this->normalize_tab( $tab ), $url );
+		}
+
+		return $url;
 	}
 }

@@ -7,6 +7,22 @@
 	margin-bottom: 18px;
 }
 
+.jlwi-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	margin: 18px 0 20px;
+	padding-inline-start: 0;
+}
+
+.jlwi-tabs .nav-tab {
+	float: none;
+	margin-inline: 0 6px;
+}
+
+.jlwi-tabs .nav-tab:first-child {
+	margin-inline-start: 0;
+}
+
 .jlwi-status-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
@@ -186,6 +202,17 @@
 }
 
 @media (max-width: 782px) {
+	.jlwi-tabs {
+		flex-wrap: nowrap;
+		overflow-x: auto;
+		padding-bottom: 1px;
+	}
+
+	.jlwi-tabs .nav-tab {
+		flex: 0 0 auto;
+		white-space: nowrap;
+	}
+
 	.jlwi-card {
 		padding: 15px;
 	}
