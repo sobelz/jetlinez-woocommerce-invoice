@@ -605,7 +605,7 @@ final class JLWI_Weekly_Report {
 	/**
 	 * Request a privacy-minimized weekly-change bar chart from QuickChart.
 	 *
-	 * The payload includes only currency labels and calculated percentage changes.
+	 * The payload includes only currency labels and normalized percentage indices.
 	 * It intentionally excludes sales amounts, dates, store identity, order details,
 	 * products, customers, recipients, and Jetlinez credentials.
 	 *
@@ -620,71 +620,116 @@ final class JLWI_Weekly_Report {
 		$current    = (array) $data['current']['sales_totals'];
 		$previous   = (array) $data['previous']['sales_totals'];
 		$currencies = array_unique( array_merge( array_keys( $current ), array_keys( $previous ) ) );
-		$labels     = array();
+		$datasets   = array();
 		$changes    = array();
-		$colors     = array();
+		$max_index  = 100.0;
 
 		foreach ( $currencies as $currency ) {
 			$current_total  = isset( $current[ $currency ] ) ? (float) $current[ $currency ] : 0.0;
 			$previous_total = isset( $previous[ $currency ] ) ? (float) $previous[ $currency ] : 0.0;
-			if ( 0.0 === $previous_total && $current_total > 0 ) {
-				// A finite growth ratio does not exist when the comparison base is zero.
+			if ( $previous_total <= 0 ) {
+				// A finite comparison index does not exist when the base is zero.
 				continue;
 			}
 
-			$change = 0.0 === $previous_total
-				? 0.0
-				: ( ( $current_total - $previous_total ) / abs( $previous_total ) ) * 100;
+			$change = ( ( $current_total - $previous_total ) / abs( $previous_total ) ) * 100;
 			if ( ! is_finite( $change ) ) {
 				continue;
 			}
 
-			$label = strtoupper( preg_replace( '/[^A-Za-z0-9_-]/', '', (string) $currency ) );
-			$labels[]  = '' !== $label ? $label : 'Sales';
-			$changes[] = round( $change, 1 );
-			$colors[]  = $change > 0 ? '#16a34a' : ( $change < 0 ? '#dc2626' : '#64748b' );
+			$change = round( $change, 1 );
+			$index  = round( max( 0, 100 + $change ), 1 );
+			$label  = strtoupper( preg_replace( '/[^A-Za-z0-9_-]/', '', (string) $currency ) );
+			$color  = $change > 0 ? '#16a34a' : ( $change < 0 ? '#dc2626' : '#64748b' );
+			$datasets[] = array(
+				'label'           => '' !== $label ? $label : 'Sales',
+				'data'            => array( 100, $index ),
+				'backgroundColor' => array( '#94a3b8', $color ),
+				'borderColor'     => array( '#64748b', $color ),
+				'borderWidth'     => 1,
+				'borderRadius'    => 7,
+				'maxBarThickness' => 120,
+			);
+			$changes[] = $change;
+			$max_index = max( $max_index, $index );
 		}
 
-		if ( empty( $changes ) ) {
+		if ( empty( $datasets ) ) {
 			return new WP_Error( 'jlwi_quickchart_change_undefined', __( 'درصد تغییر قابل نمایش برای نمودار وجود ندارد.', JLWI_TEXT_DOMAIN ) );
 		}
+
+		$subtitle = 1 === count( $datasets )
+			? sprintf( 'Previous week = 100  |  Change: %s%.1f%%', $changes[0] > 0 ? '+' : '', $changes[0] )
+			: 'Previous week = 100  |  Values are normalized per currency';
+		$suggested_max = max( 120, ceil( $max_index / 10 ) * 10 + 10 );
 
 		$payload = array(
 			'version'          => '4',
 			'backgroundColor'  => '#ffffff',
-			'width'            => 800,
-			'height'           => 450,
+			'width'            => 720,
+			'height'           => 440,
 			'devicePixelRatio' => 1,
 			'format'           => 'jpg',
 			'chart'            => array(
 				'type'    => 'bar',
 				'data'    => array(
-					'labels'   => $labels,
-					'datasets' => array(
-						array(
-							'label'           => 'Weekly sales change (%)',
-							'data'            => $changes,
-							'backgroundColor' => $colors,
-							'borderWidth'     => 0,
-						),
-					),
+					'labels'   => array( 'Previous week', 'Current week' ),
+					'datasets' => $datasets,
 				),
 				'options' => array(
-					'responsive' => false,
+					'responsive'        => false,
+					'animation'         => false,
+					'maintainAspectRatio' => false,
+					'layout'            => array(
+						'padding' => array( 'top' => 18, 'right' => 24, 'bottom' => 8, 'left' => 16 ),
+					),
 					'plugins'    => array(
-						'legend' => array( 'display' => false ),
+						'legend' => array(
+							'display'  => count( $datasets ) > 1,
+							'position' => 'bottom',
+							'labels'   => array( 'usePointStyle' => true, 'padding' => 18 ),
+						),
 						'title'  => array(
 							'display' => true,
-							'text'    => 'Week-over-week sales change (%)',
+							'text'    => 'Weekly sales comparison (indexed)',
+							'font'    => array( 'size' => 21, 'weight' => 'bold' ),
+							'padding' => array( 'bottom' => 4 ),
+						),
+						'subtitle' => array(
+							'display' => true,
+							'text'    => $subtitle,
+							'color'   => '#475569',
+							'font'    => array( 'size' => 14 ),
+							'padding' => array( 'bottom' => 16 ),
+						),
+						'datalabels' => array(
+							'display'         => true,
+							'anchor'          => 'end',
+							'align'           => 'top',
+							'offset'          => 2,
+							'clamp'           => true,
+							'color'           => '#0f172a',
+							'backgroundColor' => 'rgba(255,255,255,0.88)',
+							'borderRadius'    => 4,
+							'padding'         => 4,
+							'font'            => array( 'size' => 15, 'weight' => 'bold' ),
 						),
 					),
 					'scales'     => array(
 						'y' => array(
-							'beginAtZero' => true,
+							'beginAtZero'  => true,
+							'suggestedMax' => $suggested_max,
 							'title'       => array(
 								'display' => true,
-								'text'    => 'Change (%)',
+								'text'    => 'Sales index',
+								'font'    => array( 'size' => 14, 'weight' => 'bold' ),
 							),
+							'grid' => array( 'color' => '#e2e8f0' ),
+							'ticks' => array( 'precision' => 1 ),
+						),
+						'x' => array(
+							'grid'  => array( 'display' => false ),
+							'ticks' => array( 'font' => array( 'size' => 15, 'weight' => 'bold' ) ),
 						),
 					),
 				),
@@ -838,7 +883,9 @@ final class JLWI_Weekly_Report {
 
 		if ( isset( $enabled['orders_average'] ) ) {
 			$lines[] = '';
-			$lines[] = '🧾 ' . __( 'تعداد سفارش‌ها:', JLWI_TEXT_DOMAIN ) . ' ' . number_format_i18n( (int) $current['order_count'] );
+			$paid_order_count = array_sum( array_map( 'intval', (array) $current['paid_order_counts'] ) );
+			$lines[] = '🧾 ' . __( 'تعداد کل سفارش‌ها:', JLWI_TEXT_DOMAIN ) . ' ' . number_format_i18n( (int) $current['order_count'] );
+			$lines[] = '✅ ' . __( 'سفارش‌های پرداخت‌شده:', JLWI_TEXT_DOMAIN ) . ' ' . number_format_i18n( $paid_order_count );
 			$averages = array();
 			foreach ( $current['sales_totals'] as $currency => $total ) {
 				$count = isset( $current['paid_order_counts'][ $currency ] ) ? (int) $current['paid_order_counts'][ $currency ] : 0;
@@ -865,7 +912,7 @@ final class JLWI_Weekly_Report {
 			$new     = isset( $mix['new'] ) ? (int) $mix['new'] : 0;
 			$returning = isset( $mix['returning'] ) ? (int) $mix['returning'] : 0;
 			$lines[] = '';
-			$lines[] = '👥 *' . __( 'ترکیب مشتریان', JLWI_TEXT_DOMAIN ) . '*';
+			$lines[] = '👥 *' . __( 'ترکیب مشتریان یکتای پرداخت‌شده', JLWI_TEXT_DOMAIN ) . '*';
 			$lines[] = '• ' . __( 'مشتری جدید:', JLWI_TEXT_DOMAIN ) . ' ' . number_format_i18n( $new );
 			$lines[] = '• ' . __( 'مشتری تکراری:', JLWI_TEXT_DOMAIN ) . ' ' . number_format_i18n( $returning );
 		}
