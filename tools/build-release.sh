@@ -5,7 +5,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [[ $# -eq 0 ]]; then
-	git_dir="${repo_root}.git"
+	git_dir="${repo_root}/.git"
 else
 	git_dir=$1
 fi
