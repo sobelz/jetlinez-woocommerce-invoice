@@ -98,20 +98,27 @@ jetlinez-woocommerce-invoice/update.json
 jetlinez-woocommerce-invoice/jetlinez-woocommerce-invoice.zip
 ```
 
-پس از `git pull --ff-only` روی سرور، بسته استاندارد وردپرس را بسازید:
+برای افزایش نسخه، یکی از فرمان‌های زیر را اجرا کنید:
+
+```bash
+./tools/bump-version.sh patch "شرح تغییر patch"
+./tools/bump-version.sh minor "شرح قابلیت جدید"
+./tools/bump-version.sh major "شرح تغییر ناسازگار"
+```
+
+می‌توان چند توضیح changelog را نیز به‌صورت آرگومان‌های جدا فرستاد. اسکریپت نسخهٔ فعلی را می‌خواند و هم‌زمان هدر افزونه، ثابت `JLWI_VERSION`، مقدار `Stable tag`، نسخه و `last_updated` مانیفست و changelog را به‌روزرسانی می‌کند. قواعد افزایش نسخه به این شکل است:
+
+- `patch`: برای رفع باگ؛ مثلاً `1.8.0` به `1.8.1`
+- `minor`: برای قابلیت سازگار جدید؛ مثلاً `1.8.0` به `1.9.0`
+- `major`: برای تغییر ناسازگار؛ مثلاً `1.8.0` به `2.0.0`
+
+بعد از بررسی تغییرات، آن‌ها را commit و push کنید. سپس پس از `git pull --ff-only` روی سرور، بسته استاندارد وردپرس را بسازید:
 
 ```bash
 ./tools/build-release.sh
 ```
 
-اسکریپت یکسان بودن نسخه در هدر افزونه، ثابت `JLWI_VERSION` و `update.json` و تمیز بودن checkout را کنترل می‌کند. فایل ZIP نیز با پوشه ریشه `jetlinez-woocommerce-invoice/` ساخته می‌شود تا وردپرس افزونه را در مسیر اشتباه نصب نکند. فایل‌های خام Git به‌تنهایی قابل نصب توسط updater نیستند و وجود ZIP ضروری است.
-
-برای انتشار نسخه بعدی، نسخه را در این چهار محل تغییر دهید، تغییرات را commit/push کنید و سپس اسکریپت بالا را روی checkout همان commit اجرا کنید:
-
-- هدر `Version` در `jetlinez-woocommerce-invoice.php`
-- ثابت `JLWI_VERSION`
-- مقدار `Stable tag` در `readme.txt`
-- مقدار `version` و متن `sections.changelog` در `update.json`
+اسکریپت ساخت، یکسان بودن نسخه در هدر افزونه، ثابت `JLWI_VERSION`، مقدار `Stable tag` و `update.json` و همچنین تمیز بودن checkout را کنترل می‌کند. فایل ZIP نیز با پوشه ریشه `jetlinez-woocommerce-invoice/` ساخته می‌شود تا وردپرس افزونه را در مسیر اشتباه نصب نکند. فایل‌های خام Git به‌تنهایی قابل نصب توسط updater نیستند و وجود ZIP ضروری است.
 
 کلاس عمومی updater در `includes/updater/class-sobelz-plugin-updater.php` مستقل از این افزونه است. برای استفاده در افزونه دیگر، فایل را کپی و بعد از تعریف ثابت فایل اصلی ثبت کنید:
 

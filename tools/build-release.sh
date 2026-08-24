@@ -11,6 +11,7 @@ else
 fi
 
 plugin_file="$repo_root/jetlinez-woocommerce-invoice.php"
+readme_file="$repo_root/readme.txt"
 manifest_file="$repo_root/update.json"
 slug="jetlinez-woocommerce-invoice"
 
@@ -21,10 +22,12 @@ fi
 
 plugin_version="$(sed -n 's/^ \* Version:[[:space:]]*//p' "$plugin_file" | head -n 1)"
 constant_version="$(sed -n "s/^define( 'JLWI_VERSION', '\([^']*\)' );/\1/p" "$plugin_file" | head -n 1)"
+stable_version="$(sed -n 's/^Stable tag:[[:space:]]*//p' "$readme_file" | head -n 1)"
 manifest_version="$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$manifest_file" | head -n 1)"
 
-if [[ "$plugin_version" != "$constant_version" || "$plugin_version" != "$manifest_version" ]]; then
-	printf 'Version mismatch: header=%s constant=%s manifest=%s\n' "$plugin_version" "$constant_version" "$manifest_version" >&2
+if [[ "$plugin_version" != "$constant_version" || "$plugin_version" != "$stable_version" || "$plugin_version" != "$manifest_version" ]]; then
+	printf 'Version mismatch: header=%s constant=%s stable_tag=%s manifest=%s\n' \
+		"$plugin_version" "$constant_version" "$stable_version" "$manifest_version" >&2
 	exit 1
 fi
 
