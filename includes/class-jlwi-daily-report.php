@@ -215,7 +215,7 @@ final class JLWI_Daily_Report {
 			$yesterday_end       = $yesterday_start->modify( '+' . $elapsed_seconds . ' seconds' );
 		}
 
-		$order_sections      = array( 'sales', 'orders', 'average_order', 'new_customers', 'problem_orders' );
+		$order_sections      = array( 'sales', 'orders', 'average_order', 'new_customers', 'problem_orders', 'inventory_attention' );
 		$needs_today_orders  = ! empty( array_intersect( $sections, $order_sections ) );
 		$today_orders        = $needs_today_orders ? $this->orders_between( $today_start, $now ) : array();
 		$yesterday_orders    = in_array( 'sales', $sections, true ) ? $this->orders_between( $yesterday_start, $yesterday_end ) : array();
@@ -233,7 +233,7 @@ final class JLWI_Daily_Report {
 			'new_customers'      => in_array( 'new_customers', $sections, true )
 				? JLWI_Report_Customers::mix( $today_orders, $today_start, 'daily' )['new']
 				: 0,
-			'inventory_attention' => in_array( 'inventory_attention', $sections, true ) ? $this->inventory_attention() : array(),
+			'inventory_attention' => in_array( 'inventory_attention', $sections, true ) ? $this->inventory_attention( $today_orders ) : array(),
 		);
 
 		/**
@@ -450,74 +450,113 @@ final class JLWI_Daily_Report {
 	}
 
 	/**
-	 * Find unavailable, backordered, and low-stock products from WooCommerce's
-	 * product lookup table. Product storage is not affected by order HPOS.
+	 * Find products made out of stock by paid orders in the report interval.
 	 *
+	 * WooCommerce stores the quantity actually deducted from stock on each line
+	 * item. Adding those deductions back to the current quantity reconstructs
+	 * the stock at the beginning of the interval. A product is included only
+	 * when it is out of stock now and that reconstructed quantity was positive.
+	 *
+	 * @param array $orders Orders created in the report interval.
 	 * @return array
 	 */
-	private function inventory_attention() {
-		global $wpdb;
-
+	private function inventory_attention( $orders ) {
 		$empty = array( 'total' => 0, 'items' => array() );
-		if ( ! is_object( $wpdb ) || empty( $wpdb->posts ) || empty( $wpdb->postmeta ) ) {
+		if ( ! function_exists( 'wc_get_product' ) ) {
 			$filtered_empty = apply_filters( 'jlwi_daily_report_inventory_attention', $empty );
 			return is_array( $filtered_empty ) ? $filtered_empty : $empty;
 		}
 
-		$lookup_table = ! empty( $wpdb->wc_product_meta_lookup )
-			? $wpdb->wc_product_meta_lookup
-			: ( ! empty( $wpdb->prefix ) ? $wpdb->prefix . 'wc_product_meta_lookup' : '' );
-		if ( '' === $lookup_table ) {
-			$filtered_empty = apply_filters( 'jlwi_daily_report_inventory_attention', $empty );
-			return is_array( $filtered_empty ) ? $filtered_empty : $empty;
+		$paid_statuses = JLWI_Report_Customers::paid_statuses();
+		$reductions    = array();
+
+		foreach ( (array) $orders as $order ) {
+			if ( ! is_object( $order ) || ! method_exists( $order, 'get_status' ) || ! method_exists( $order, 'get_items' ) ) {
+				continue;
+			}
+
+			$status = JLWI_Settings::normalize_status( $order->get_status() );
+			if ( ! in_array( $status, $paid_statuses, true ) ) {
+				continue;
+			}
+
+			foreach ( (array) $order->get_items( 'line_item' ) as $item ) {
+				if ( ! is_object( $item ) ) {
+					continue;
+				}
+
+				$reduced = method_exists( $item, 'get_meta' ) ? (float) $item->get_meta( '_reduced_stock', true ) : 0.0;
+				if ( $reduced <= 0 ) {
+					continue;
+				}
+
+				$product = method_exists( $item, 'get_product' ) ? $item->get_product() : false;
+				if ( ! $product ) {
+					$product_id   = method_exists( $item, 'get_product_id' ) ? (int) $item->get_product_id() : 0;
+					$variation_id = method_exists( $item, 'get_variation_id' ) ? (int) $item->get_variation_id() : 0;
+					$product      = wc_get_product( $variation_id > 0 ? $variation_id : $product_id );
+				}
+
+				if ( ! $product || ( method_exists( $product, 'managing_stock' ) && ! $product->managing_stock() ) ) {
+					continue;
+				}
+
+				$product_id = method_exists( $product, 'get_id' ) ? (int) $product->get_id() : 0;
+				$stock_id   = method_exists( $product, 'get_stock_managed_by_id' ) ? (int) $product->get_stock_managed_by_id() : $product_id;
+				if ( $stock_id <= 0 ) {
+					continue;
+				}
+
+				if ( ! isset( $reductions[ $stock_id ] ) ) {
+					$reductions[ $stock_id ] = 0.0;
+				}
+				$reductions[ $stock_id ] += $reduced;
+			}
 		}
 
-		$global_low = max( 0, (float) get_option( 'woocommerce_notify_low_stock_amount', 2 ) );
-		$limit      = max( 1, min( 20, (int) apply_filters( 'jlwi_daily_report_inventory_limit', 5 ) ) );
-		$threshold  = $wpdb->prepare(
-			"CASE WHEN low_stock.meta_value IS NOT NULL AND low_stock.meta_value <> '' THEN CAST(low_stock.meta_value AS DECIMAL(20,4)) ELSE %f END",
-			$global_low
-		);
-		$where      = "FROM {$lookup_table} lookup
-			INNER JOIN {$wpdb->posts} products ON products.ID = lookup.product_id
-			LEFT JOIN {$wpdb->postmeta} low_stock ON low_stock.post_id = lookup.product_id AND low_stock.meta_key = '_low_stock_amount'
-			WHERE products.post_type IN ('product', 'product_variation')
-			AND products.post_status IN ('publish', 'private')
-			AND (
-				lookup.stock_status IN ('outofstock', 'onbackorder')
-				OR (
-					lookup.stock_status = 'instock'
-					AND lookup.stock_quantity IS NOT NULL
-					AND lookup.stock_quantity <= {$threshold}
-				)
-			)";
-
-		$total = (int) $wpdb->get_var( "SELECT COUNT(DISTINCT lookup.product_id) {$where}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery
-		$sql   = $wpdb->prepare(
-			"SELECT DISTINCT lookup.product_id, lookup.stock_quantity, lookup.stock_status {$where}
-			ORDER BY FIELD(lookup.stock_status, 'outofstock', 'onbackorder', 'instock'), lookup.stock_quantity ASC
-			LIMIT %d",
-			$limit
-		);
-		$rows  = $wpdb->get_results( $sql, ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$items = array();
+		foreach ( $reductions as $product_id => $reduced ) {
+			$product = wc_get_product( (int) $product_id );
+			if ( ! $product || ! method_exists( $product, 'get_stock_status' ) || ! method_exists( $product, 'get_stock_quantity' ) ) {
+				continue;
+			}
 
-		foreach ( (array) $rows as $row ) {
-			$product = function_exists( 'wc_get_product' ) ? wc_get_product( (int) $row['product_id'] ) : false;
-			$name    = $product && method_exists( $product, 'get_name' ) ? $product->get_name() : get_the_title( (int) $row['product_id'] );
+			$stock_status   = sanitize_key( (string) $product->get_stock_status() );
+			$stock_quantity = $product->get_stock_quantity();
+			if ( 'outofstock' !== $stock_status || null === $stock_quantity ) {
+				continue;
+			}
+
+			$stock_quantity = (float) $stock_quantity;
+			if ( $stock_quantity > 0 || $stock_quantity + $reduced <= 0 ) {
+				continue;
+			}
+
+			$name = method_exists( $product, 'get_name' ) ? $product->get_name() : get_the_title( (int) $product_id );
 			if ( '' === trim( (string) $name ) ) {
 				continue;
 			}
 
 			$items[] = array(
-				'id'             => (int) $row['product_id'],
+				'id'             => (int) $product_id,
 				'name'           => wp_strip_all_tags( (string) $name ),
-				'stock_status'   => sanitize_key( (string) $row['stock_status'] ),
-				'stock_quantity' => null === $row['stock_quantity'] ? null : (float) $row['stock_quantity'],
+				'stock_status'   => $stock_status,
+				'stock_quantity' => $stock_quantity,
+				'sold_quantity'  => $reduced,
 			);
 		}
 
-		$attention = array( 'total' => $total, 'items' => $items );
+		usort(
+			$items,
+			static function ( $left, $right ) {
+				$quantity_compare = (float) $right['sold_quantity'] <=> (float) $left['sold_quantity'];
+				return 0 !== $quantity_compare ? $quantity_compare : strcmp( $left['name'], $right['name'] );
+			}
+		);
+
+		$total     = count( $items );
+		$limit     = max( 1, min( 20, (int) apply_filters( 'jlwi_daily_report_inventory_limit', 5 ) ) );
+		$attention = array( 'total' => $total, 'items' => array_slice( $items, 0, $limit ) );
 		$filtered  = apply_filters( 'jlwi_daily_report_inventory_attention', $attention );
 		return is_array( $filtered ) ? $filtered : $attention;
 	}
@@ -609,7 +648,10 @@ final class JLWI_Daily_Report {
 		$attention = isset( $data['inventory_attention'] ) && is_array( $data['inventory_attention'] ) ? $data['inventory_attention'] : array();
 		if ( isset( $enabled['inventory_attention'] ) && ! empty( $attention['items'] ) ) {
 			$lines[] = '';
-			$lines[] = '📉 *' . __( 'موجودی نیازمند توجه', JLWI_TEXT_DOMAIN ) . '*';
+			$inventory_label = $is_rolling
+				? __( 'محصولات ناموجودشده بر اثر فروش بازه', JLWI_TEXT_DOMAIN )
+				: __( 'محصولات ناموجودشده بر اثر فروش امروز', JLWI_TEXT_DOMAIN );
+			$lines[] = '📉 *' . $inventory_label . '*';
 			foreach ( $attention['items'] as $item ) {
 				$status = isset( $item['stock_status'] ) ? $item['stock_status'] : '';
 				if ( 'outofstock' === $status ) {

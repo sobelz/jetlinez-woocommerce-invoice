@@ -393,7 +393,7 @@ final class JLWI_Settings {
 			'average_order'       => __( 'میانگین مبلغ سفارش', JLWI_TEXT_DOMAIN ),
 			'new_customers'       => __( 'تعداد مشتری جدید', JLWI_TEXT_DOMAIN ),
 			'problem_orders'      => __( 'سفارش‌های لغو، مرجوع و رهاشده', JLWI_TEXT_DOMAIN ),
-			'inventory_attention' => __( 'محصولات و موجودی‌های نیازمند توجه', JLWI_TEXT_DOMAIN ),
+			'inventory_attention' => __( 'محصولات ناموجودشده بر اثر فروش همان بازه', JLWI_TEXT_DOMAIN ),
 		);
 	}
 

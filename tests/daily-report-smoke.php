@@ -125,9 +125,28 @@ function wc_get_orders( $args ) {
 	$day        = substr( $start_time, 0, 10 );
 	if ( '2026-08-15' === $day ) {
 		$orders = array(
-			new JLWI_Test_Report_Order( 'processing', 1000, 0, '2026-08-15 10:00:00', 1 ),
+			new JLWI_Test_Report_Order(
+				'processing',
+				1000,
+				0,
+				'2026-08-15 10:00:00',
+				1,
+				array(
+					new JLWI_Test_Report_Item( 101, 10, 2, 2 ),
+					new JLWI_Test_Report_Item( 102, 11, 1, 1 ),
+					new JLWI_Test_Report_Item( 103, 12, 1, 1 ),
+					new JLWI_Test_Report_Item( 106, 20, 2, 2 ),
+				)
+			),
 			new JLWI_Test_Report_Order( 'completed', 2000, 500, '2026-08-15 11:00:00', 2 ),
-			new JLWI_Test_Report_Order( 'cancelled', 400, 0, '2026-08-15 12:00:00' ),
+			new JLWI_Test_Report_Order(
+				'cancelled',
+				400,
+				0,
+				'2026-08-15 12:00:00',
+				0,
+				array( new JLWI_Test_Report_Item( 104, 13, 1, 1 ) )
+			),
 			new JLWI_Test_Report_Order( 'failed', 300, 0, '2026-08-15 13:00:00' ),
 			new JLWI_Test_Report_Order( 'pending', 100, 0, '2026-08-15 14:00:00' ),
 		);
@@ -138,7 +157,14 @@ function wc_get_orders( $args ) {
 		);
 	} elseif ( '2026-08-14 20:00:00' === $start_time ) {
 		$orders = array(
-			new JLWI_Test_Report_Order( 'processing', 4000, 0, '2026-08-15 08:00:00', 2 ),
+			new JLWI_Test_Report_Order(
+				'processing',
+				4000,
+				0,
+				'2026-08-15 08:00:00',
+				2,
+				array( new JLWI_Test_Report_Item( 105, 10, 2, 2 ) )
+			),
 		);
 	} else {
 		$orders = array(
@@ -223,14 +249,16 @@ class JLWI_Test_Report_Order {
 	private $total;
 	private $refunded;
 	private $created;
+	private $items;
 
-	public function __construct( $status, $total, $refunded, $created, $customer_id = 0 ) {
+	public function __construct( $status, $total, $refunded, $created, $customer_id = 0, $items = array() ) {
 		$this->id       = self::$next_id++;
 		$this->customer_id = (int) $customer_id;
 		$this->status   = $status;
 		$this->total    = $total;
 		$this->refunded = $refunded;
 		$this->created  = new DateTimeImmutable( $created, wp_timezone() );
+		$this->items    = $items;
 	}
 
 	public function get_status() {
@@ -260,6 +288,48 @@ class JLWI_Test_Report_Order {
 	public function get_date_created() {
 		return $this->created;
 	}
+
+	public function get_items() {
+		return $this->items;
+	}
+}
+
+class JLWI_Test_Report_Item {
+	private $id;
+	private $product_id;
+	private $quantity;
+	private $reduced_stock;
+
+	public function __construct( $id, $product_id, $quantity, $reduced_stock ) {
+		$this->id            = $id;
+		$this->product_id    = $product_id;
+		$this->quantity      = $quantity;
+		$this->reduced_stock = $reduced_stock;
+	}
+
+	public function get_id() {
+		return $this->id;
+	}
+
+	public function get_product_id() {
+		return $this->product_id;
+	}
+
+	public function get_variation_id() {
+		return 0;
+	}
+
+	public function get_quantity() {
+		return $this->quantity;
+	}
+
+	public function get_meta( $key ) {
+		return '_reduced_stock' === $key ? $this->reduced_stock : '';
+	}
+
+	public function get_product() {
+		return wc_get_product( $this->product_id );
+	}
 }
 
 class JLWI_Test_Product {
@@ -272,38 +342,32 @@ class JLWI_Test_Product {
 	public function get_name() {
 		return 'Product ' . $this->id;
 	}
-}
 
-class JLWI_Test_WPDB {
-	public $wc_product_meta_lookup = 'wp_wc_product_meta_lookup';
-	public $posts                  = 'wp_posts';
-	public $postmeta               = 'wp_postmeta';
-
-	public function prepare( $query, $value ) {
-		if ( false !== strpos( $query, '%d' ) ) {
-			return str_replace( '%d', (string) (int) $value, $query );
-		}
-
-		return str_replace( '%f', number_format( (float) $value, 6, '.', '' ), $query );
+	public function get_id() {
+		return $this->id;
 	}
 
-	public function get_var() {
-		return 2;
+	public function managing_stock() {
+		return true;
 	}
 
-	public function get_results() {
-		return array(
-			array(
-				'product_id'      => 10,
-				'stock_quantity'  => null,
-				'stock_status'    => 'outofstock',
-			),
-			array(
-				'product_id'      => 11,
-				'stock_quantity'  => '1',
-				'stock_status'    => 'instock',
-			),
+	public function get_stock_managed_by_id() {
+		return 20 === $this->id ? 15 : $this->id;
+	}
+
+	public function get_stock_status() {
+		return 11 === $this->id ? 'instock' : 'outofstock';
+	}
+
+	public function get_stock_quantity() {
+		$quantities = array(
+			10 => 0,
+			11 => 1,
+			12 => -2,
+			13 => 0,
+			15 => 0,
 		);
+		return isset( $quantities[ $this->id ] ) ? $quantities[ $this->id ] : null;
 	}
 }
 
@@ -327,8 +391,6 @@ class JLWI_API_Client {
 		return array( 'success' => true );
 	}
 }
-
-$wpdb = new JLWI_Test_WPDB();
 
 require dirname( __DIR__ ) . '/includes/class-jlwi-settings.php';
 require dirname( __DIR__ ) . '/includes/class-jlwi-report-customers.php';
@@ -365,8 +427,12 @@ foreach ( $GLOBALS['jlwi_daily_previous_customer_queries'] as $previous_query ) 
 jlwi_test_assert( false !== strpos( $message, 'لغوشده: 1' ), 'Cancelled order count is incorrect.' );
 jlwi_test_assert( false !== strpos( $message, 'مرجوع/بازپرداخت‌شده: 1' ), 'Refunded order count is incorrect.' );
 jlwi_test_assert( false !== strpos( $message, 'رهاشده: 2' ), 'Abandoned order count is incorrect.' );
-jlwi_test_assert( false !== strpos( $message, 'Product 10 — ناموجود' ), 'Out-of-stock product is missing.' );
-jlwi_test_assert( false !== strpos( $message, 'Product 11 — موجودی: 1' ), 'Low-stock product is missing.' );
+jlwi_test_assert( false !== strpos( $message, 'محصولات ناموجودشده بر اثر فروش امروز' ), 'Sold-out section title is missing.' );
+jlwi_test_assert( false !== strpos( $message, 'Product 10 — ناموجود' ), 'Product made out of stock by today\'s sales is missing.' );
+jlwi_test_assert( false !== strpos( $message, 'Product 15 — ناموجود' ), 'Parent-managed variation stock was not reported against its stock owner.' );
+jlwi_test_assert( false === strpos( $message, 'Product 11' ), 'A merely low-stock product should not be reported.' );
+jlwi_test_assert( false === strpos( $message, 'Product 12' ), 'A product that was already out of stock should not be reported.' );
+jlwi_test_assert( false === strpos( $message, 'Product 13' ), 'Stock from an unpaid order should not be reported.' );
 
 $rolling_message = $report->build_message( 'last_24_hours' );
 jlwi_test_assert( ! is_wp_error( $rolling_message ), 'Rolling 24-hour report returned an error.' );
@@ -379,7 +445,11 @@ $GLOBALS['jlwi_test_options'][ JLWI_OPTION ]['daily_report_sections'] = array( '
 $orders_only = $report->build_message();
 jlwi_test_assert( false !== strpos( $orders_only, 'تعداد سفارش‌ها: 5' ), 'Selected order section was omitted.' );
 jlwi_test_assert( false === strpos( $orders_only, 'فروش امروز:' ), 'Disabled sales section was rendered.' );
-jlwi_test_assert( false === strpos( $orders_only, 'موجودی نیازمند توجه' ), 'Disabled inventory section was rendered.' );
+jlwi_test_assert( false === strpos( $orders_only, 'محصولات ناموجودشده' ), 'Disabled inventory section was rendered.' );
+
+$GLOBALS['jlwi_test_options'][ JLWI_OPTION ]['daily_report_sections'] = array( 'inventory_attention' );
+$inventory_only = $report->build_message();
+jlwi_test_assert( false !== strpos( $inventory_only, 'Product 10 — ناموجود' ), 'Inventory-only report did not load interval orders.' );
 
 $GLOBALS['jlwi_test_options'][ JLWI_OPTION ]['daily_report_sections'] = array( 'new_customers' );
 $customers_only = $report->build_message();
