@@ -68,6 +68,7 @@ final class JLWI_Settings {
 			'delete_data_on_uninstall'          => 'no',
 			'daily_report_enabled'              => 'no',
 			'daily_report_time'                 => '20:00',
+			'daily_report_full_previous_day'    => 'no',
 			'daily_report_sections'             => array(
 				'sales',
 				'orders',
@@ -388,7 +389,7 @@ final class JLWI_Settings {
 	 */
 	public static function report_section_labels() {
 		return array(
-			'sales'               => __( 'فروش امروز و تغییر نسبت به دیروز', JLWI_TEXT_DOMAIN ),
+			'sales'               => __( 'فروش بازه و تغییر نسبت به بازه قبل', JLWI_TEXT_DOMAIN ),
 			'orders'              => __( 'تعداد سفارش‌ها', JLWI_TEXT_DOMAIN ),
 			'average_order'       => __( 'میانگین مبلغ سفارش', JLWI_TEXT_DOMAIN ),
 			'new_customers'       => __( 'تعداد مشتری جدید', JLWI_TEXT_DOMAIN ),

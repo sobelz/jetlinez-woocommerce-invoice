@@ -350,6 +350,13 @@ final class JLWI_Admin {
 							</td>
 						</tr>
 						<tr>
+							<th scope="row"><?php echo esc_html__( 'بازه گزارش خودکار', JLWI_TEXT_DOMAIN ); ?></th>
+							<td>
+								<?php $this->checkbox( 'daily_report_full_previous_day', $settings['daily_report_full_previous_day'], __( 'گزارش کامل روز تقویمی گذشته ارسال شود (از ۰۰:۰۰ تا ۲۳:۵۹).', JLWI_TEXT_DOMAIN ) ); ?>
+								<p class="description"><?php echo esc_html__( 'اگر این گزینه خاموش باشد، گزارش بازهٔ شناور ۲۴ ساعت منتهی به زمان اجرای گزارش ارسال می‌شود.', JLWI_TEXT_DOMAIN ); ?></p>
+							</td>
+						</tr>
+						<tr>
 							<th scope="row"><?php echo esc_html__( 'بخش‌های گزارش', JLWI_TEXT_DOMAIN ); ?></th>
 							<td>
 								<input type="hidden" name="jlwi[daily_report_sections][]" value="">
@@ -592,7 +599,7 @@ X-API-KEY: ********
 				$new[ $key ] = '' !== trim( $value ) ? $value : $defaults[ $key ];
 			}
 		} elseif ( 'reports' === $active_tab ) {
-			foreach ( array( 'daily_report_enabled', 'weekly_report_enabled' ) as $key ) {
+			foreach ( array( 'daily_report_enabled', 'daily_report_full_previous_day', 'weekly_report_enabled' ) as $key ) {
 				$new[ $key ] = isset( $raw[ $key ] ) ? 'yes' : 'no';
 			}
 
@@ -813,9 +820,13 @@ X-API-KEY: ********
 		$status = isset( $state['status'], $status_labels[ $state['status'] ] ) ? $status_labels[ $state['status'] ] : __( 'نامشخص', JLWI_TEXT_DOMAIN );
 		$sent   = isset( $state['sent'] ) ? (int) $state['sent'] : 0;
 		$failed = isset( $state['failed'] ) ? (int) $state['failed'] : 0;
-		$period = isset( $state['period'] ) && 'last_24_hours' === $state['period']
-			? __( 'گزارش ۲۴ ساعت گذشته', JLWI_TEXT_DOMAIN )
-			: __( 'گزارش روزانه', JLWI_TEXT_DOMAIN );
+		if ( isset( $state['period'] ) && 'last_24_hours' === $state['period'] ) {
+			$period = __( 'گزارش ۲۴ ساعت گذشته', JLWI_TEXT_DOMAIN );
+		} elseif ( isset( $state['period'] ) && 'previous_day' === $state['period'] ) {
+			$period = __( 'گزارش کامل روز گذشته', JLWI_TEXT_DOMAIN );
+		} else {
+			$period = __( 'گزارش روزانه', JLWI_TEXT_DOMAIN );
+		}
 		?>
 		<p class="description jlwi-report-result">
 			<?php

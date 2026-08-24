@@ -441,6 +441,14 @@ jlwi_test_assert( false !== strpos( $rolling_message, 'فروش ۲۴ ساعت گ
 jlwi_test_assert( false !== strpos( $rolling_message, '+100.0%' ), 'Rolling report comparison is incorrect.' );
 jlwi_test_assert( false !== strpos( $rolling_message, 'تعداد سفارش‌های ۲۴ ساعت گذشته: 1' ), 'Rolling report order count is incorrect.' );
 
+$previous_day_message = $report->build_message( 'previous_day' );
+jlwi_test_assert( ! is_wp_error( $previous_day_message ), 'Complete previous-day report returned an error.' );
+jlwi_test_assert( false !== strpos( $previous_day_message, 'گزارش کامل روز گذشته فروشگاه' ), 'Previous-day report title is missing.' );
+jlwi_test_assert( false !== strpos( $previous_day_message, 'بازه: 2026-08-14 00:00 تا 2026-08-14 23:59' ), 'Previous-day report did not use exact calendar-day boundaries.' );
+jlwi_test_assert( false !== strpos( $previous_day_message, 'فروش روز گذشته: 3,000 IRR' ), 'Previous-day sales are incorrect.' );
+jlwi_test_assert( false !== strpos( $previous_day_message, '+50.0%' ), 'Previous-day comparison is incorrect.' );
+jlwi_test_assert( false !== strpos( $previous_day_message, 'تعداد سفارش‌های روز گذشته: 2' ), 'Previous-day order count is incorrect.' );
+
 $GLOBALS['jlwi_test_options'][ JLWI_OPTION ]['daily_report_sections'] = array( 'orders' );
 $orders_only = $report->build_message();
 jlwi_test_assert( false !== strpos( $orders_only, 'تعداد سفارش‌ها: 5' ), 'Selected order section was omitted.' );
@@ -465,6 +473,19 @@ foreach ( $GLOBALS['jlwi_test_messages'] as $sent_message ) {
 }
 jlwi_test_assert( false !== strpos( $delivery['message'], 'گزارش ۲۴ ساعت گذشته فروشگاه' ), 'Immediate delivery did not use the rolling report.' );
 jlwi_test_assert( 'last_24_hours' === $GLOBALS['jlwi_test_options'][ JLWI_REPORT_STATE_OPTION ]['period'], 'Last report state did not retain the rolling period.' );
+
+$GLOBALS['jlwi_test_options'][ JLWI_OPTION ]['daily_report_full_previous_day'] = 'yes';
+$GLOBALS['jlwi_test_messages'] = array();
+$report->run_scheduled_report();
+jlwi_test_assert( 2 === count( $GLOBALS['jlwi_test_messages'] ), 'Scheduled previous-day report was not delivered.' );
+jlwi_test_assert( false !== strpos( $GLOBALS['jlwi_test_messages'][0][1], 'گزارش کامل روز گذشته فروشگاه' ), 'Scheduled report ignored the complete previous-day setting.' );
+jlwi_test_assert( 'previous_day' === $GLOBALS['jlwi_test_options'][ JLWI_REPORT_STATE_OPTION ]['period'], 'Scheduled report state did not retain the previous-day period.' );
+
+$GLOBALS['jlwi_test_options'][ JLWI_OPTION ]['daily_report_full_previous_day'] = 'no';
+$GLOBALS['jlwi_test_messages'] = array();
+$report->run_scheduled_report();
+jlwi_test_assert( false !== strpos( $GLOBALS['jlwi_test_messages'][0][1], 'گزارش ۲۴ ساعت گذشته فروشگاه' ), 'Scheduled report did not retain the rolling 24-hour mode.' );
+jlwi_test_assert( 'last_24_hours' === $GLOBALS['jlwi_test_options'][ JLWI_REPORT_STATE_OPTION ]['period'], 'Scheduled rolling report state is incorrect.' );
 
 $GLOBALS['jlwi_test_options'][ JLWI_OPTION ]['daily_report_time'] = '21:15';
 JLWI_Daily_Report::reschedule();

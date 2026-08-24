@@ -35,7 +35,8 @@ final class JLWI_Daily_Report {
 
 		self::schedule_next();
 
-		$result = $this->send_now();
+		$period = JLWI_Settings::enabled( 'daily_report_full_previous_day' ) ? 'previous_day' : 'last_24_hours';
+		$result = $this->send_now( $period );
 		if ( is_wp_error( $result ) ) {
 			$this->log(
 				'error',
@@ -118,7 +119,7 @@ final class JLWI_Daily_Report {
 	 * not require the schedule toggle, so an administrator can test before
 	 * enabling daily delivery.
 	 *
-	 * @param string $period Report period: today or last_24_hours.
+	 * @param string $period Report period: today, last_24_hours or previous_day.
 	 * @return array|WP_Error Delivery counters or error.
 	 */
 	public function send_now( $period = 'today' ) {
@@ -189,7 +190,7 @@ final class JLWI_Daily_Report {
 	/**
 	 * Generate a plain-text daily report from current WooCommerce data.
 	 *
-	 * @param string $period Report period: today or last_24_hours.
+	 * @param string $period Report period: today, last_24_hours or previous_day.
 	 * @return string|WP_Error Message or query error.
 	 */
 	public function build_message( $period = 'today' ) {
@@ -203,10 +204,16 @@ final class JLWI_Daily_Report {
 			return new WP_Error( 'jlwi_report_no_sections', __( 'حداقل یک بخش برای گزارش روزانه انتخاب کنید.', JLWI_TEXT_DOMAIN ) );
 		}
 
-		$now = current_datetime();
+		$now        = current_datetime();
+		$report_end = $now;
 		if ( 'last_24_hours' === $period ) {
 			$today_start     = $now->setTimestamp( $now->getTimestamp() - DAY_IN_SECONDS );
 			$yesterday_start = $today_start->setTimestamp( $today_start->getTimestamp() - DAY_IN_SECONDS );
+			$yesterday_end   = $today_start->modify( '-1 second' );
+		} elseif ( 'previous_day' === $period ) {
+			$today_start     = $now->setTime( 0, 0, 0 )->modify( '-1 day' );
+			$report_end      = $today_start->modify( '+1 day -1 second' );
+			$yesterday_start = $today_start->modify( '-1 day' );
 			$yesterday_end   = $today_start->modify( '-1 second' );
 		} else {
 			$today_start         = $now->setTime( 0, 0, 0 );
@@ -217,15 +224,16 @@ final class JLWI_Daily_Report {
 
 		$order_sections      = array( 'sales', 'orders', 'average_order', 'new_customers', 'problem_orders', 'inventory_attention' );
 		$needs_today_orders  = ! empty( array_intersect( $sections, $order_sections ) );
-		$today_orders        = $needs_today_orders ? $this->orders_between( $today_start, $now ) : array();
+		$today_orders        = $needs_today_orders ? $this->orders_between( $today_start, $report_end ) : array();
 		$yesterday_orders    = in_array( 'sales', $sections, true ) ? $this->orders_between( $yesterday_start, $yesterday_end ) : array();
 
-		$today     = $this->summarize_orders( $today_orders, $now );
+		$today     = $this->summarize_orders( $today_orders, $report_end );
 		$yesterday = $this->summarize_orders( $yesterday_orders, $yesterday_end );
 		$data      = array(
 			'period'              => $period,
 			'generated_at'        => $now,
 			'today_start'        => $today_start,
+			'report_end'          => $report_end,
 			'yesterday_start'    => $yesterday_start,
 			'yesterday_end'      => $yesterday_end,
 			'today'              => $today,
@@ -569,22 +577,52 @@ final class JLWI_Daily_Report {
 	 * @return string
 	 */
 	private function render_message( $data, $sections ) {
-		$now       = $data['generated_at'];
-		$today     = $data['today'];
-		$yesterday = $data['yesterday'];
-		$period    = isset( $data['period'] ) ? $this->normalize_period( $data['period'] ) : 'today';
-		$is_rolling = 'last_24_hours' === $period;
-		$enabled   = array_fill_keys( $sections, true );
-		$lines     = array(
-			'📊 *' . ( $is_rolling ? __( 'گزارش ۲۴ ساعت گذشته فروشگاه', JLWI_TEXT_DOMAIN ) : __( 'گزارش روزانه فروشگاه', JLWI_TEXT_DOMAIN ) ) . '*',
+		$now        = $data['generated_at'];
+		$report_end = isset( $data['report_end'] ) && $data['report_end'] instanceof DateTimeInterface ? $data['report_end'] : $now;
+		$today      = $data['today'];
+		$yesterday  = $data['yesterday'];
+		$period     = isset( $data['period'] ) ? $this->normalize_period( $data['period'] ) : 'today';
+		$is_rolling      = 'last_24_hours' === $period;
+		$is_previous_day = 'previous_day' === $period;
+		$enabled         = array_fill_keys( $sections, true );
+		if ( $is_rolling ) {
+			$title             = __( 'گزارش ۲۴ ساعت گذشته فروشگاه', JLWI_TEXT_DOMAIN );
+			$sales_label       = __( 'فروش ۲۴ ساعت گذشته:', JLWI_TEXT_DOMAIN );
+			$change_label      = __( 'تغییر نسبت به ۲۴ ساعت قبل:', JLWI_TEXT_DOMAIN );
+			$multi_sales_label = __( 'فروش ۲۴ ساعت گذشته و تغییر نسبت به ۲۴ ساعت قبل:', JLWI_TEXT_DOMAIN );
+			$order_label       = __( 'تعداد سفارش‌های ۲۴ ساعت گذشته:', JLWI_TEXT_DOMAIN );
+			$customer_label    = __( 'مشتری جدید در ۲۴ ساعت گذشته:', JLWI_TEXT_DOMAIN );
+			$inventory_label   = __( 'محصولات ناموجودشده بر اثر فروش بازه', JLWI_TEXT_DOMAIN );
+			$comparison_note   = __( 'ارقام با ۲۴ ساعت بلافاصله قبل از بازه گزارش مقایسه شده‌اند.', JLWI_TEXT_DOMAIN );
+		} elseif ( $is_previous_day ) {
+			$title             = __( 'گزارش کامل روز گذشته فروشگاه', JLWI_TEXT_DOMAIN );
+			$sales_label       = __( 'فروش روز گذشته:', JLWI_TEXT_DOMAIN );
+			$change_label      = __( 'تغییر نسبت به روز قبل:', JLWI_TEXT_DOMAIN );
+			$multi_sales_label = __( 'فروش روز گذشته و تغییر نسبت به روز قبل:', JLWI_TEXT_DOMAIN );
+			$order_label       = __( 'تعداد سفارش‌های روز گذشته:', JLWI_TEXT_DOMAIN );
+			$customer_label    = __( 'مشتری جدید در روز گذشته:', JLWI_TEXT_DOMAIN );
+			$inventory_label   = __( 'محصولات ناموجودشده بر اثر فروش روز گذشته', JLWI_TEXT_DOMAIN );
+			$comparison_note   = __( 'ارقام با روز تقویمی کامل قبل از بازه گزارش مقایسه شده‌اند.', JLWI_TEXT_DOMAIN );
+		} else {
+			$title             = __( 'گزارش روزانه فروشگاه', JLWI_TEXT_DOMAIN );
+			$sales_label       = __( 'فروش امروز:', JLWI_TEXT_DOMAIN );
+			$change_label      = __( 'تغییر نسبت به بازه مشابه دیروز:', JLWI_TEXT_DOMAIN );
+			$multi_sales_label = __( 'فروش امروز و تغییر نسبت به دیروز:', JLWI_TEXT_DOMAIN );
+			$order_label       = __( 'تعداد سفارش‌ها:', JLWI_TEXT_DOMAIN );
+			$customer_label    = __( 'مشتری جدید:', JLWI_TEXT_DOMAIN );
+			$inventory_label   = __( 'محصولات ناموجودشده بر اثر فروش امروز', JLWI_TEXT_DOMAIN );
+			$comparison_note   = __( 'ارقام امروز تا زمان گزارش و مقایسه با همین بازه زمانی در دیروز هستند.', JLWI_TEXT_DOMAIN );
+		}
+		$lines = array(
+			'📊 *' . $title . '*',
 			'🏪 ' . wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ),
 			'🗓 ' . wp_date( get_option( 'date_format' ) . ' — ' . get_option( 'time_format' ), $now->getTimestamp(), wp_timezone() ),
 		);
-		if ( $is_rolling ) {
+		if ( $is_rolling || $is_previous_day ) {
 			$lines[] = sprintf(
 				'⏱ ' . __( 'بازه: %1$s تا %2$s', JLWI_TEXT_DOMAIN ),
 				wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $data['today_start']->getTimestamp(), wp_timezone() ),
-				wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $now->getTimestamp(), wp_timezone() )
+				wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $report_end->getTimestamp(), wp_timezone() )
 			);
 		}
 		$content_count = 0;
@@ -596,12 +634,10 @@ final class JLWI_Daily_Report {
 				$currency = reset( $currencies );
 				$current  = isset( $today['sales_totals'][ $currency ] ) ? (float) $today['sales_totals'][ $currency ] : 0.0;
 				$previous = isset( $yesterday['sales_totals'][ $currency ] ) ? (float) $yesterday['sales_totals'][ $currency ] : 0.0;
-				$sales_label  = $is_rolling ? __( 'فروش ۲۴ ساعت گذشته:', JLWI_TEXT_DOMAIN ) : __( 'فروش امروز:', JLWI_TEXT_DOMAIN );
-				$change_label = $is_rolling ? __( 'تغییر نسبت به ۲۴ ساعت قبل:', JLWI_TEXT_DOMAIN ) : __( 'تغییر نسبت به بازه مشابه دیروز:', JLWI_TEXT_DOMAIN );
 				$lines[]      = '💰 ' . $sales_label . ' ' . $this->format_money( $current, $currency );
 				$lines[]      = '📈 ' . $change_label . ' ' . $this->format_change( $current, $previous );
 			} else {
-				$lines[] = '💰 ' . ( $is_rolling ? __( 'فروش ۲۴ ساعت گذشته و تغییر نسبت به ۲۴ ساعت قبل:', JLWI_TEXT_DOMAIN ) : __( 'فروش امروز و تغییر نسبت به دیروز:', JLWI_TEXT_DOMAIN ) );
+				$lines[] = '💰 ' . $multi_sales_label;
 				foreach ( $currencies as $currency ) {
 					$current  = isset( $today['sales_totals'][ $currency ] ) ? (float) $today['sales_totals'][ $currency ] : 0.0;
 					$previous = isset( $yesterday['sales_totals'][ $currency ] ) ? (float) $yesterday['sales_totals'][ $currency ] : 0.0;
@@ -613,7 +649,6 @@ final class JLWI_Daily_Report {
 
 		if ( isset( $enabled['orders'] ) ) {
 			$lines[] = '';
-			$order_label = $is_rolling ? __( 'تعداد سفارش‌های ۲۴ ساعت گذشته:', JLWI_TEXT_DOMAIN ) : __( 'تعداد سفارش‌ها:', JLWI_TEXT_DOMAIN );
 			$lines[] = '🧾 ' . $order_label . ' ' . number_format_i18n( (int) $today['order_count'] );
 			++$content_count;
 		}
@@ -631,7 +666,6 @@ final class JLWI_Daily_Report {
 
 		if ( isset( $enabled['new_customers'] ) ) {
 			$lines[] = '';
-			$customer_label = $is_rolling ? __( 'مشتری جدید در ۲۴ ساعت گذشته:', JLWI_TEXT_DOMAIN ) : __( 'مشتری جدید:', JLWI_TEXT_DOMAIN );
 			$lines[] = '👤 ' . $customer_label . ' ' . number_format_i18n( (int) $data['new_customers'] );
 			++$content_count;
 		}
@@ -648,9 +682,6 @@ final class JLWI_Daily_Report {
 		$attention = isset( $data['inventory_attention'] ) && is_array( $data['inventory_attention'] ) ? $data['inventory_attention'] : array();
 		if ( isset( $enabled['inventory_attention'] ) && ! empty( $attention['items'] ) ) {
 			$lines[] = '';
-			$inventory_label = $is_rolling
-				? __( 'محصولات ناموجودشده بر اثر فروش بازه', JLWI_TEXT_DOMAIN )
-				: __( 'محصولات ناموجودشده بر اثر فروش امروز', JLWI_TEXT_DOMAIN );
 			$lines[] = '📉 *' . $inventory_label . '*';
 			foreach ( $attention['items'] as $item ) {
 				$status = isset( $item['stock_status'] ) ? $item['stock_status'] : '';
@@ -680,9 +711,7 @@ final class JLWI_Daily_Report {
 
 		if ( isset( $enabled['sales'] ) ) {
 			$lines[] = '';
-			$lines[] = 'ℹ️ ' . ( $is_rolling
-				? __( 'ارقام با ۲۴ ساعت بلافاصله قبل از بازه گزارش مقایسه شده‌اند.', JLWI_TEXT_DOMAIN )
-				: __( 'ارقام امروز تا زمان گزارش و مقایسه با همین بازه زمانی در دیروز هستند.', JLWI_TEXT_DOMAIN ) );
+			$lines[] = 'ℹ️ ' . $comparison_note;
 		}
 
 		return implode( "\n", $lines );
@@ -715,7 +744,7 @@ final class JLWI_Daily_Report {
 	private function format_change( $current, $previous ) {
 		if ( 0.0 === (float) $previous ) {
 			return (float) $current > 0
-				? __( 'فروش جدید (دیروز صفر)', JLWI_TEXT_DOMAIN )
+				? __( 'فروش جدید (بازه قبل صفر)', JLWI_TEXT_DOMAIN )
 				: __( 'بدون تغییر', JLWI_TEXT_DOMAIN );
 		}
 
@@ -743,7 +772,7 @@ final class JLWI_Daily_Report {
 	 */
 	private function normalize_period( $period ) {
 		$period = is_scalar( $period ) ? sanitize_key( (string) $period ) : '';
-		return 'last_24_hours' === $period ? 'last_24_hours' : 'today';
+		return in_array( $period, array( 'last_24_hours', 'previous_day' ), true ) ? $period : 'today';
 	}
 
 	/**
