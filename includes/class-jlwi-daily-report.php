@@ -9,8 +9,9 @@ defined( 'ABSPATH' ) || exit;
 
 final class JLWI_Daily_Report {
 
-	const CRON_HOOK = 'jlwi_send_daily_report';
-	const LOCK_KEY  = 'jlwi_daily_report_lock';
+	const CRON_HOOK         = 'jlwi_send_daily_report';
+	const LOCK_KEY          = 'jlwi_daily_report_lock';
+	const RUN_OPTION_PREFIX = 'jlwi_daily_report_run_';
 
 	/**
 	 * Register report and scheduling hooks.
@@ -36,12 +37,50 @@ final class JLWI_Daily_Report {
 		self::schedule_next();
 
 		$period = JLWI_Settings::enabled( 'daily_report_full_previous_day' ) ? 'previous_day' : 'last_24_hours';
+		$run    = $this->scheduled_run_identity( $period );
+		$claim  = $this->claim_scheduled_run( $run, $period );
+		if ( is_wp_error( $claim ) ) {
+			$this->log(
+				'error',
+				'Daily report cron run could not be claimed safely.',
+				array(
+					'run_key'    => $run['key'],
+					'period'     => $period,
+					'error_code' => $claim->get_error_code(),
+				)
+			);
+			return;
+		}
+		if ( ! $claim ) {
+			$this->log(
+				'warning',
+				'Duplicate daily report cron execution skipped.',
+				array(
+					'run_key' => $run['key'],
+					'period'  => $period,
+				)
+			);
+			return;
+		}
+
+		$this->log(
+			'info',
+			'Daily WhatsApp scheduled report started.',
+			array(
+				'run_key' => $run['key'],
+				'period'  => $period,
+			)
+		);
+
 		$result = $this->send_now( $period );
+		$this->finish_scheduled_run( $run, $period, $result );
 		if ( is_wp_error( $result ) ) {
 			$this->log(
 				'error',
 				'Daily WhatsApp report failed.',
 				array(
+					'run_key'   => $run['key'],
+					'period'    => $period,
 					'error_code' => $result->get_error_code(),
 					'error'      => $result->get_error_message(),
 				)
@@ -54,10 +93,124 @@ final class JLWI_Daily_Report {
 			$level,
 			'Daily WhatsApp report finished.',
 			array(
-				'sent'   => (int) $result['sent'],
-				'failed' => (int) $result['failed'],
+				'run_key' => $run['key'],
+				'period'  => $period,
+				'sent'    => (int) $result['sent'],
+				'failed'  => (int) $result['failed'],
 			)
 		);
+	}
+
+	/**
+	 * Build a stable identifier for one scheduled daily-report occurrence.
+	 *
+	 * Complete-day reports are keyed by the calendar date they report. Rolling
+	 * reports are keyed by the most recent configured schedule slot. This keeps
+	 * delayed cron runs and duplicate callbacks idempotent while leaving manual
+	 * sends unrestricted.
+	 *
+	 * @param string $period Normalized report period.
+	 * @return array{key:string,option:string}
+	 */
+	private function scheduled_run_identity( $period ) {
+		$now = current_datetime();
+		if ( 'previous_day' === $period ) {
+			$mode = 'previous';
+			$date = $now->modify( '-1 day' );
+		} else {
+			$mode = 'rolling';
+			$time = JLWI_Settings::sanitize_report_time( JLWI_Settings::get( 'daily_report_time', '20:00' ) );
+			$date = new DateTimeImmutable( $now->format( 'Y-m-d' ) . ' ' . $time . ':00', wp_timezone() );
+			if ( $now->getTimestamp() < $date->getTimestamp() ) {
+				$date = $date->modify( '-1 day' );
+			}
+		}
+
+		$date_key = $date->format( 'Ymd' );
+		$run_key  = $mode . '_' . $date_key;
+		return array(
+			'key'    => $run_key,
+			'option' => self::RUN_OPTION_PREFIX . $run_key,
+		);
+	}
+
+	/**
+	 * Atomically claim a scheduled run before sending any message.
+	 *
+	 * add_option() is backed by WordPress's unique option-name constraint, so
+	 * only one of two concurrent cron processes can acquire the same run key.
+	 * The marker remains after completion to also block sequential duplicates.
+	 *
+	 * @param array  $run    Scheduled run identity.
+	 * @param string $period Normalized report period.
+	 * @return bool|WP_Error
+	 */
+	private function claim_scheduled_run( $run, $period ) {
+		$claimed = add_option(
+			$run['option'],
+			array(
+				'run_key'    => $run['key'],
+				'period'     => $period,
+				'status'     => 'running',
+				'started_at' => time(),
+			),
+			'',
+			'no'
+		);
+
+		$this->cleanup_scheduled_run_markers();
+		if ( $claimed ) {
+			return true;
+		}
+
+		if ( false === get_option( $run['option'], false ) ) {
+			return new WP_Error(
+				'jlwi_daily_report_claim_failed',
+				__( 'ثبت شناسه یکتای اجرای گزارش روزانه در دیتابیس ناموفق بود.', JLWI_TEXT_DOMAIN )
+			);
+		}
+
+		return false;
+	}
+
+	/**
+	 * Persist the outcome for cron diagnostics and duplicate protection.
+	 *
+	 * @param array          $run    Scheduled run identity.
+	 * @param string         $period Normalized report period.
+	 * @param array|WP_Error $result Delivery result.
+	 * @return void
+	 */
+	private function finish_scheduled_run( $run, $period, $result ) {
+		$state = get_option( $run['option'], array() );
+		$state = is_array( $state ) ? $state : array();
+		$state['run_key']     = $run['key'];
+		$state['period']      = $period;
+		$state['finished_at'] = time();
+
+		if ( is_wp_error( $result ) ) {
+			$state['status']     = 'failed';
+			$state['sent']       = 0;
+			$state['failed']     = 0;
+			$state['error_code'] = sanitize_key( (string) $result->get_error_code() );
+		} else {
+			$state['sent']   = isset( $result['sent'] ) ? max( 0, (int) $result['sent'] ) : 0;
+			$state['failed'] = isset( $result['failed'] ) ? max( 0, (int) $result['failed'] ) : 0;
+			$state['status'] = $state['failed'] > 0 ? 'partial' : 'success';
+		}
+
+		update_option( $run['option'], $state, false );
+	}
+
+	/**
+	 * Keep roughly six weeks of scheduled-run diagnostic markers.
+	 *
+	 * @return void
+	 */
+	private function cleanup_scheduled_run_markers() {
+		$expired_date = current_datetime()->modify( '-45 days' )->format( 'Ymd' );
+		delete_option( self::RUN_OPTION_PREFIX . 'previous_' . $expired_date );
+		delete_option( self::RUN_OPTION_PREFIX . 'rolling_' . $expired_date );
 	}
 
 	/**

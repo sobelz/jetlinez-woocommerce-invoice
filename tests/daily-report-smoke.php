@@ -21,6 +21,9 @@ function get_option( $key, $default = false ) {
 	if ( JLWI_OPTION === $key ) {
 		return isset( $GLOBALS['jlwi_test_options'][ $key ] ) ? $GLOBALS['jlwi_test_options'][ $key ] : array();
 	}
+	if ( array_key_exists( $key, $GLOBALS['jlwi_test_options'] ) ) {
+		return $GLOBALS['jlwi_test_options'][ $key ];
+	}
 
 	$values = array(
 		'woocommerce_hold_stock_minutes'       => 60,
@@ -34,6 +37,20 @@ function get_option( $key, $default = false ) {
 
 function update_option( $key, $value ) {
 	$GLOBALS['jlwi_test_options'][ $key ] = $value;
+	return true;
+}
+
+function add_option( $key, $value ) {
+	if ( array_key_exists( $key, $GLOBALS['jlwi_test_options'] ) ) {
+		return false;
+	}
+
+	$GLOBALS['jlwi_test_options'][ $key ] = $value;
+	return true;
+}
+
+function delete_option( $key ) {
+	unset( $GLOBALS['jlwi_test_options'][ $key ] );
 	return true;
 }
 
@@ -480,12 +497,24 @@ $report->run_scheduled_report();
 jlwi_test_assert( 2 === count( $GLOBALS['jlwi_test_messages'] ), 'Scheduled previous-day report was not delivered.' );
 jlwi_test_assert( false !== strpos( $GLOBALS['jlwi_test_messages'][0][1], 'گزارش کامل روز گذشته فروشگاه' ), 'Scheduled report ignored the complete previous-day setting.' );
 jlwi_test_assert( 'previous_day' === $GLOBALS['jlwi_test_options'][ JLWI_REPORT_STATE_OPTION ]['period'], 'Scheduled report state did not retain the previous-day period.' );
+jlwi_test_assert( 'success' === $GLOBALS['jlwi_test_options']['jlwi_daily_report_run_previous_20260814']['status'], 'Scheduled previous-day run marker was not completed.' );
+
+$report->run_scheduled_report();
+jlwi_test_assert( 2 === count( $GLOBALS['jlwi_test_messages'] ), 'Duplicate previous-day cron execution sent the report again.' );
 
 $GLOBALS['jlwi_test_options'][ JLWI_OPTION ]['daily_report_full_previous_day'] = 'no';
 $GLOBALS['jlwi_test_messages'] = array();
 $report->run_scheduled_report();
 jlwi_test_assert( false !== strpos( $GLOBALS['jlwi_test_messages'][0][1], 'گزارش ۲۴ ساعت گذشته فروشگاه' ), 'Scheduled report did not retain the rolling 24-hour mode.' );
 jlwi_test_assert( 'last_24_hours' === $GLOBALS['jlwi_test_options'][ JLWI_REPORT_STATE_OPTION ]['period'], 'Scheduled rolling report state is incorrect.' );
+jlwi_test_assert( 'success' === $GLOBALS['jlwi_test_options']['jlwi_daily_report_run_rolling_20260815']['status'], 'Scheduled rolling run marker was not completed.' );
+
+$report->run_scheduled_report();
+jlwi_test_assert( 2 === count( $GLOBALS['jlwi_test_messages'] ), 'Duplicate rolling cron execution sent the report again.' );
+
+$manual_after_cron = $report->send_now( 'last_24_hours' );
+jlwi_test_assert( ! is_wp_error( $manual_after_cron ), 'Manual report was blocked by the scheduled-run marker.' );
+jlwi_test_assert( 4 === count( $GLOBALS['jlwi_test_messages'] ), 'Manual report did not remain available after scheduled delivery.' );
 
 $GLOBALS['jlwi_test_options'][ JLWI_OPTION ]['daily_report_time'] = '21:15';
 JLWI_Daily_Report::reschedule();

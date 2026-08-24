@@ -24,3 +24,5 @@ delete_transient( 'jlwi_weekly_report_lock' );
 global $wpdb;
 $like = $wpdb->esc_like( 'jlwi_lock_' ) . '%';
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", $like ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+$like = $wpdb->esc_like( 'jlwi_daily_report_run_' ) . '%';
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", $like ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
